@@ -17,7 +17,8 @@ export {
 
 export { PassauPixelRenderer } from './passau-pixel-renderer.js';
 
-export { animationById, selectAppearanceFrame } from './animation.js';
+export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, selectAppearanceFrame, stateAnimationId } from './animation.js';
+export { DirectionalSwipeInput } from './input.js';
 export { FixedStepLoop } from './simulation/fixed-step-loop.js';
 export { moveGridActor } from './simulation/grid-motion.js';
 export { DEFAULT_DIFFICULTY_PROFILES } from './simulation/profiles.js';
@@ -27,6 +28,7 @@ export {
   canMoveOnGrid,
   wrapGridActor,
   movePlayerActor,
+  queuePlayerDirection,
   moveCatActor,
   chooseCatDirection,
 } from './simulation/actor-motion.js';

@@ -1,6 +1,6 @@
 import { compileWallGrid, createLevelDocument, tileKey } from '../level-format.js';
 import { DEFAULT_DIFFICULTY_PROFILES } from './profiles.js';
-import { DIRECTIONS, canMoveOnGrid, chooseCatDirection, directionByName, moveCatActor, movePlayerActor, wrapGridActor } from './actor-motion.js';
+import { DIRECTIONS, canMoveOnGrid, chooseCatDirection, directionByName, moveCatActor, movePlayerActor, queuePlayerDirection, wrapGridActor } from './actor-motion.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -43,7 +43,7 @@ export class LevelSimulation {
 
   setDirection(name) {
     if (DIRECTIONS[name]) {
-      this.player.nextDir = DIRECTIONS[name]; this.directionHistory.push(name);
+      queuePlayerDirection(this.player, DIRECTIONS[name]); this.directionHistory.push(name);
       const maximum = Math.max(1, ...this.level.events.map((event) => event.trigger.sequence.length)); this.directionHistory = this.directionHistory.slice(-maximum);
     }
   }

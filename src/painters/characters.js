@@ -4,7 +4,7 @@ const DIRECTIONS = Object.freeze({
 });
 const directionOf = (direction) => typeof direction === 'string' ? DIRECTIONS[direction] ?? DIRECTIONS.none : direction?.name ? direction : DIRECTIONS.none;
 
-function drawPixelAppearance(context, actor, tileSize, { animationId = '', elapsed = 0 } = {}) {
+function drawPixelAppearance(context, actor, tileSize, { animationId = '', state = 'idle', elapsed = 0 } = {}) {
   const appearance = actor.appearance;
   if (!appearance) return false;
   const scale = Math.max(1, Math.floor((tileSize * 0.9) / Math.max(appearance.width, appearance.height)));
@@ -12,7 +12,7 @@ function drawPixelAppearance(context, actor, tileSize, { animationId = '', elaps
   const height = appearance.height * scale;
   const left = Math.round(actor.x * tileSize + (tileSize - width) / 2);
   const top = Math.round(actor.y * tileSize + (tileSize - height) / 2);
-  const pixels = selectAppearanceFrame(appearance, { animationId, elapsed });
+  const pixels = selectAppearanceFrame(appearance, { animationId, state, elapsed });
   pixels.forEach((row, y) => [...row].forEach((token, x) => {
     const paletteIndex = Number.parseInt(token, 36);
     const pixelColor = appearance.palette[paletteIndex];
@@ -40,8 +40,8 @@ export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 
   const queued = directionOf(player.nextDirection ?? player.nextDir);
   const direction = current.name === 'none' ? queued : current;
   if (hitTimer > 0 && Math.floor(hitTimer * 10) % 2 === 0) return;
-  const animationId = player.animation ?? (direction.name === 'none' ? 'idle' : 'walk');
-  if (drawPixelAppearance(context, player, tileSize, { animationId, elapsed })) return;
+  const state = direction.name === 'none' ? 'idle' : direction.name;
+  if (drawPixelAppearance(context, player, tileSize, { animationId: player.animation ?? '', state, elapsed })) return;
   const px = Math.round(player.x * tileSize + tileSize / 2);
   const py = Math.round(player.y * tileSize + tileSize / 2);
   const dir = direction.name === 'none' ? DIRECTIONS.left : direction;
@@ -63,8 +63,9 @@ export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 
 export function drawCat(context, cat, tileSize, { frightened = false, frightenedTime = 0 } = {}) {
   if (cat.respawnTimer > 0 && Math.floor(cat.respawnTimer * 8) % 2 === 0) return;
   const elapsed = Number(cat.elapsed) || 0;
-  if (frightened && animationById(cat.appearance, 'frightened') && drawPixelAppearance(context, cat, tileSize, { animationId: 'frightened', elapsed })) return;
-  if (!frightened && drawPixelAppearance(context, cat, tileSize, { animationId: cat.animation ?? (directionOf(cat.dir).name === 'none' ? 'idle' : 'walk'), elapsed })) return;
+  if (frightened && animationById(cat.appearance, 'frightened') && drawPixelAppearance(context, cat, tileSize, { animationId: 'frightened', state: 'idle', elapsed })) return;
+  const catDirection = directionOf(cat.dir);
+  if (!frightened && drawPixelAppearance(context, cat, tileSize, { animationId: cat.animation ?? '', state: catDirection.name === 'none' ? 'idle' : catDirection.name, elapsed })) return;
   const px = Math.round(cat.x * tileSize + tileSize / 2); const py = Math.round(cat.y * tileSize + tileSize / 2);
   const flashing = frightened && frightenedTime < 2 && Math.floor(frightenedTime * 8) % 2;
   const body = frightened ? (flashing ? '#f3eee0' : '#2379a3') : cat.color; const accent = frightened ? '#174e77' : cat.accent;

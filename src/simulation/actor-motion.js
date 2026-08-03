@@ -12,6 +12,15 @@ export function directionByName(name, fallback = DIRECTIONS.none) {
   return DIRECTIONS[name] ?? fallback;
 }
 
+export function queuePlayerDirection(actor, direction) {
+  if (!actor || !direction || direction.name === 'none') return false;
+  const current = actor.dir ?? DIRECTIONS.none;
+  actor.nextDir = direction;
+  const reversing = current.name !== 'none' && current.x === -direction.x && current.y === -direction.y;
+  if (reversing) actor.dir = direction;
+  return reversing;
+}
+
 export function canMoveOnGrid(level, grid, x, y, direction) {
   if (!direction || direction.name === 'none') return false;
   let nextX = Math.round(x) + direction.x;

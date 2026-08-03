@@ -21,6 +21,7 @@ Ein Level ist reines JSON mit `kind: "franz-lola-level"` und `schemaVersion: 1`.
 - Landmarken und vollständige Farbpaletten
 - Franz & Lola, beliebig viele Katzen und Power-ups
 - optionale Pixel-Sprites mit Palette, benannten Animationen, frei vielen Frames, FPS und Loop-Modus
+- explizite Spielerzustände `idle`, `up`, `right`, `down` und `left`, die frei auf Sprite-Animationen abgebildet werden
 - frei konfigurierbares Spieler- und Katzenverhalten (Steuerung, Jagdstrategie, Ziel, Tempo, Voraussicht und Zufall)
 - Dekorationen wie Bäume, Bänke, Lampen, Schilder, Wasser oder freie Symbole mit Schwebe-, Puls-, Blink- und Drehbewegung
 - frei definierbare Ereignisse mit Triggerzonen, Richtungsfolgen oder Zeitpunkten, lokalisierten Standard-/Dialekttexten, Belohnungen und Sichtbarkeitsregeln
@@ -35,6 +36,8 @@ Das maschinenlesbare Schema liegt unter `schema/franz-lola-level.schema.json` un
 `render(snapshot, options)` arbeitet unabhängig von der Bildfrequenz und kann interpolierte Actor-Snapshots anzeigen. `cameraEnabled: false` verwendet eine unverzerrte Contain-/Letterbox-Projektion für Editoren; die Spielkamera folgt bei aktivierter Kamera dem Spieler. Neue immutable Levelobjekte werden auch bei gleicher ID zuverlässig übernommen.
 
 `FixedStepLoop` und `LevelSimulation` sind der gemeinsame Gameplay-Vertrag. Die Simulation läuft mit festen 120 Updates pro Sekunde; Displays mit 60, 120 oder 175 Hz zeigen interpolierte Bilder, ohne Spieltempo, Kollisionen oder Richtungswechsel zu verändern.
+
+`DirectionalSwipeInput` und `queuePlayerDirection()` bilden außerdem den gemeinsamen Eingabevertrag für Spiel und Editor-Testlauf: Wischen reagiert während der Geste, Gegenrichtungen kehren sofort um und Abzweigungen werden bis zum nächsten gültigen Rasterzentrum gepuffert, ohne die Figur zu versetzen.
 
 Umgebungsdetails sind Teil desselben Renderers. Dazu gehören auch die animierte Zauberberg-Bühne mit zwei transparenten Lichtkegeln, Verstärkern, Lautsprechern und Musiknote sowie die Ereignissymbole und optional eingeblendeten Triggerzonen des Editors.
 

@@ -85,7 +85,34 @@ function normalizeAppearance(value) {
       .slice(0, 64)
       .map((frame) => ({ pixels: normalizePixels(frame?.pixels ?? frame, width, height, palette.length) })),
   }));
-  return { width, height, palette, pixels, animations };
+  const animationIds = new Set(animations.map((animation) => animation.id));
+  const stateAnimations = Object.fromEntries(['idle', 'up', 'right', 'down', 'left'].map((state) => {
+    const requested = text(value.stateAnimations?.[state], '');
+    if (animationIds.has(requested)) return [state, requested];
+    if (animationIds.has(state)) return [state, state];
+    if (state !== 'idle' && animationIds.has('walk')) return [state, 'walk'];
+    if (animationIds.has('idle')) return [state, 'idle'];
+    return [state, ''];
+  }));
+  return { width, height, palette, pixels, animations, stateAnimations };
+}
+
+function normalizeMotionAnimation(value, fallback = {}) {
+  return {
+    type: ['none', 'bob', 'pulse', 'blink', 'spin'].includes(value?.type) ? value.type : (fallback.type ?? 'none'),
+    speed: clamp(finite(value?.speed, fallback.speed ?? 1), 0.1, 12),
+    amplitude: clamp(finite(value?.amplitude, fallback.amplitude ?? 0.15), 0, 1),
+  };
+}
+
+function normalizeThemeElements(value, landmark) {
+  const defaults = landmark === 'zauberberg' ? [
+    { id: 'stage-note', animation: { type: 'bob', speed: 1.1, amplitude: 0.125 } },
+    { id: 'stage-lights', animation: { type: 'none', speed: 1, amplitude: 0.15 } },
+  ] : [];
+  const source = Array.isArray(value) ? value : [];
+  const merged = [...defaults.map((fallback) => ({ ...fallback, ...(source.find((item) => item?.id === fallback.id) ?? {}) })), ...source.filter((item) => !defaults.some((fallback) => fallback.id === item?.id))];
+  return merged.slice(0, 32).map((item, index) => ({ id: slug(item?.id, `theme-element-${index + 1}`), animation: normalizeMotionAnimation(item?.animation, defaults.find((fallback) => fallback.id === item?.id)?.animation) }));
 }
 
 function normalizeDecoration(value, index, columns, rows) {
@@ -100,11 +127,7 @@ function normalizeDecoration(value, index, columns, rows) {
     height: clamp(integer(value?.height, 1), 1, rows),
     color: color(value?.color, '#55d9dd'),
     label: text(value?.label, type === 'custom' ? '◆' : ''),
-    animation: {
-      type: ['none', 'bob', 'pulse', 'blink', 'spin'].includes(value?.animation?.type) ? value.animation.type : 'none',
-      speed: clamp(finite(value?.animation?.speed, 1), 0.1, 12),
-      amplitude: clamp(finite(value?.animation?.amplitude, 0.15), 0, 1),
-    },
+    animation: normalizeMotionAnimation(value?.animation),
   };
 }
 
@@ -179,6 +202,8 @@ export function createLevelDocument(input = {}) {
   const powerUps = Array.isArray(input.collectibles?.powerUps)
     ? input.collectibles.powerUps
     : [{ x: 1, y: 1 }, { x: columns - 2, y: 1 }, { x: 1, y: rows - 2 }, { x: columns - 2, y: rows - 2 }];
+  const landmark = text(input.theme?.landmark, 'dog-park');
+  const themeElements = normalizeThemeElements(input.theme?.elements, landmark);
 
   return {
     kind: LEVEL_DOCUMENT_KIND,
@@ -209,13 +234,14 @@ export function createLevelDocument(input = {}) {
     },
     theme: {
       id: text(input.theme?.id, 'neighborhood'),
-      landmark: text(input.theme?.landmark, 'dog-park'),
+      landmark,
       palette: {
         ground: Array.from({ length: 4 }, (_, index) => color(input.theme?.palette?.ground?.[index], DEFAULT_PALETTE.ground[index])),
         curb: color(input.theme?.palette?.curb, DEFAULT_PALETTE.curb),
         walls: Array.from({ length: 4 }, (_, index) => color(input.theme?.palette?.walls?.[index], DEFAULT_PALETTE.walls[index])),
         water: color(input.theme?.palette?.water, DEFAULT_PALETTE.water),
       },
+      ...(themeElements.length ? { elements: themeElements } : {}),
     },
     actors: {
       player: {

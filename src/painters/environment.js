@@ -138,6 +138,20 @@ function drawFactory(context, level) {
   context.fillText('TABAKFABRIK', left + width / 2, top + 31);
 }
 
+function themeElementAnimation(level, id, fallback) {
+  return level.theme.elements?.find((element) => element.id === id)?.animation ?? fallback;
+}
+
+function applyMotionAnimation(context, animation, elapsed, centerX, centerY, tile) {
+  const phase = elapsed * Math.PI * 2 * animation.speed;
+  context.translate(centerX, centerY);
+  if (animation.type === 'bob') context.translate(0, Math.sin(phase) * tile * animation.amplitude);
+  if (animation.type === 'pulse') { const scale = 1 + Math.sin(phase) * animation.amplitude; context.scale(scale, scale); }
+  if (animation.type === 'spin') context.rotate(phase * animation.amplitude);
+  if (animation.type === 'blink') context.globalAlpha *= Math.sin(phase) > 0 ? 1 : Math.max(0.08, 1 - animation.amplitude);
+  context.translate(-centerX, -centerY);
+}
+
 function drawStage(context, level, elapsed) {
   const { columns, tileSize } = level.board;
   const width = 9 * tileSize;
@@ -148,7 +162,7 @@ function drawStage(context, level, elapsed) {
   context.fillRect(left + 4, top + 9, width - 8, height - 9);
   context.fillStyle = '#34203f';
   context.fillRect(left + 12, top + 17, width - 24, height - 28);
-  context.save(); context.globalAlpha = 0.16;
+  context.save(); context.globalAlpha = 0.16; applyMotionAnimation(context, themeElementAnimation(level, 'stage-lights', { type: 'none', speed: 1, amplitude: 0.15 }), elapsed, left + width / 2, top + height / 2, tileSize);
   zauberbergSpotlightPolygons(left, top, width, height).forEach(({ color, points }) => {
     context.fillStyle = color; context.beginPath(); context.moveTo(...points[0]); points.slice(1).forEach((point) => context.lineTo(...point)); context.closePath(); context.fill();
   });
@@ -166,9 +180,10 @@ function drawStage(context, level, elapsed) {
   context.fillStyle = '#f1e0b7';
   context.font = '7px monospace';
   context.fillText('ROCK · PUNK · METAL', left + width / 2, top + 49);
-  const bounce = Math.round(Math.sin(elapsed * 7) * 3);
+  context.save(); applyMotionAnimation(context, themeElementAnimation(level, 'stage-note', { type: 'bob', speed: 1.1, amplitude: 0.125 }), elapsed, left + width / 2, top + 79, tileSize);
   context.fillStyle = '#63d9d4';
-  zauberbergNoteRectangles(left, top, width, bounce).forEach(([x, y, noteWidth, noteHeight]) => context.fillRect(x, y, noteWidth, noteHeight));
+  zauberbergNoteRectangles(left, top, width, 0).forEach(([x, y, noteWidth, noteHeight]) => context.fillRect(x, y, noteWidth, noteHeight));
+  context.restore();
 }
 
 export function zauberbergSpotlightPolygons(left, top, width, height) {
