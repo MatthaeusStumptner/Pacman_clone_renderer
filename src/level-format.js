@@ -121,6 +121,54 @@ function normalizeDifficultyProfile(value, fallback) {
   };
 }
 
+function slug(value, fallback) {
+  return text(value, fallback).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
+}
+
+function normalizeEventRectangle(value, columns, rows) {
+  const x = clamp(integer(value?.x, 0), 0, columns - 1);
+  const y = clamp(integer(value?.y, 0), 0, rows - 1);
+  return {
+    x,
+    y,
+    width: clamp(integer(value?.width, 1), 1, columns - x),
+    height: clamp(integer(value?.height, 1), 1, rows - y),
+  };
+}
+
+function normalizeLevelEvent(value, index, columns, rows) {
+  const id = slug(value?.id, `event-${index + 1}`);
+  const triggerTypes = ['zone', 'direction-sequence', 'time'];
+  const visualTypes = ['kingfisher', 'paw', 'bell', 'custom', 'none'];
+  const triggerType = triggerTypes.includes(value?.trigger?.type) ? value.trigger.type : 'zone';
+  const defaultVisual = id.includes('ilz') ? 'kingfisher' : id.includes('hund') ? 'paw' : id.includes('glock') ? 'bell' : 'custom';
+  return {
+    id,
+    kind: 'easter-egg',
+    name: normalizeLocalized(value?.name, `Ereignis ${index + 1}`),
+    message: normalizeLocalized(value?.message, 'Geheimnis entdeckt!'),
+    reward: clamp(integer(value?.reward, 100), -9999, 9999),
+    scope: ['global', 'level', 'run'].includes(value?.scope) ? value.scope : 'global',
+    trigger: {
+      type: triggerType,
+      zones: (Array.isArray(value?.trigger?.zones) && value.trigger.zones.length ? value.trigger.zones : [{ x: 1, y: 1, width: 1, height: 1 }])
+        .slice(0, 32).map((zone) => normalizeEventRectangle(zone, columns, rows)),
+      sequence: (Array.isArray(value?.trigger?.sequence) ? value.trigger.sequence : [])
+        .filter((direction) => ['up', 'down', 'left', 'right'].includes(direction)).slice(0, 32),
+      seconds: clamp(finite(value?.trigger?.seconds, 10), 0, 3600),
+    },
+    visual: {
+      type: visualTypes.includes(value?.visual?.type) ? value.visual.type : defaultVisual,
+      x: clamp(finite(value?.visual?.x, defaultVisual === 'kingfisher' ? 0.375 : columns / 2), 0, columns),
+      y: clamp(finite(value?.visual?.y, defaultVisual === 'kingfisher' ? 6 : defaultVisual === 'bell' ? 0.5 : rows * 0.488), 0, rows),
+      color: color(value?.visual?.color, '#55d9dd'),
+      accent: color(value?.visual?.accent, '#f5c451'),
+      label: text(value?.visual?.label, '◆'),
+      visibility: ['after-trigger', 'always'].includes(value?.visual?.visibility) ? value.visual.visibility : 'after-trigger',
+    },
+  };
+}
+
 export function createLevelDocument(input = {}) {
   const columns = Math.max(5, integer(input.board?.columns, 25));
   const rows = Math.max(5, integer(input.board?.rows, 25));
@@ -207,6 +255,8 @@ export function createLevelDocument(input = {}) {
     },
     decorations: (Array.isArray(input.decorations) ? input.decorations : [])
       .map((entry, index) => normalizeDecoration(entry, index, columns, rows)),
+    events: (Array.isArray(input.events) ? input.events : [])
+      .slice(0, 64).map((entry, index) => normalizeLevelEvent(entry, index, columns, rows)),
   };
 }
 
@@ -298,6 +348,19 @@ export function validateLevelDocument(input) {
   level.decorations.forEach((item, index) => {
     if (item.x + item.width > level.board.columns || item.y + item.height > level.board.rows) {
       warnings.push(`Dekoration ${index + 1} ragt über das Spielfeld hinaus.`);
+    }
+  });
+  const eventIds = level.events.map((event) => event.id);
+  if (new Set(eventIds).size !== eventIds.length) errors.push('Ereignis-IDs müssen innerhalb eines Levels eindeutig sein.');
+  level.events.forEach((event, index) => {
+    if (!event.message.standard.trim() || !event.message.dialect.trim()) warnings.push(`Ereignis ${index + 1} hat keinen vollständigen Standard-/Dialekttext.`);
+    if (event.trigger.type === 'direction-sequence' && event.trigger.sequence.length === 0) errors.push(`Ereignis ${index + 1} benötigt mindestens eine Richtung.`);
+    if (event.trigger.type === 'zone') {
+      const reachableZone = event.trigger.zones.some((zone) => {
+        for (let y = zone.y; y < zone.y + zone.height; y += 1) for (let x = zone.x; x < zone.x + zone.width; x += 1) if (reachable.has(tileKey(x, y))) return true;
+        return false;
+      });
+      if (!reachableZone) warnings.push(`Triggerzone von Ereignis ${index + 1} ist vom Startpunkt nicht erreichbar.`);
     }
   });
   return {

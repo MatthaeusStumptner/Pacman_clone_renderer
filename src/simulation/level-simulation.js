@@ -15,12 +15,13 @@ function nearestDirection(actor, targets, canMove) {
 }
 
 export class LevelSimulation {
-  constructor(levelInput, { difficulty = 'normal', pellets = [], powerUps, random = Math.random } = {}) {
+  constructor(levelInput, { difficulty = 'normal', pellets = [], powerUps, random = Math.random, unlockedEvents = [] } = {}) {
     this.level = createLevelDocument(levelInput);
     this.grid = compileWallGrid(this.level);
     this.difficultyName = DEFAULT_DIFFICULTY_PROFILES[difficulty] ? difficulty : 'normal';
     this.config = { ...DEFAULT_DIFFICULTY_PROFILES[this.difficultyName], ...this.level.gameplay.difficulties[this.difficultyName] };
     this.random = random;
+    this.initialUnlockedEvents = new Set(unlockedEvents);
     this.initialPellets = new Set(pellets);
     this.initialPowerUps = new Set(powerUps ?? this.level.collectibles.powerUps.map((point) => tileKey(point.x, point.y)));
     this.reset();
@@ -29,6 +30,7 @@ export class LevelSimulation {
   reset() {
     this.elapsed = 0; this.powerTimer = 0; this.hitTimer = 0; this.graceTimer = this.config.grace; this.state = 'playing'; this.collected = 0; this.score = 0;
     this.lives = this.config.lives; this.pellets = new Set(this.initialPellets); this.powerUps = new Set(this.initialPowerUps); this.events = [];
+    this.unlockedEvents = new Set(this.initialUnlockedEvents); this.activeEventId = ''; this.activeEventTimer = 0; this.directionHistory = [];
     const playerSource = this.level.actors.player;
     this.player = { ...clone(playerSource), x: playerSource.x, y: playerSource.y, previousX: playerSource.x, previousY: playerSource.y, dir: DIRECTIONS.left, nextDir: DIRECTIONS.left };
     this.cats = this.level.actors.cats.slice(0, this.config.catCount).map((source, index) => ({
@@ -40,7 +42,10 @@ export class LevelSimulation {
   }
 
   setDirection(name) {
-    if (DIRECTIONS[name]) this.player.nextDir = DIRECTIONS[name];
+    if (DIRECTIONS[name]) {
+      this.player.nextDir = DIRECTIONS[name]; this.directionHistory.push(name);
+      const maximum = Math.max(1, ...this.level.events.map((event) => event.trigger.sequence.length)); this.directionHistory = this.directionHistory.slice(-maximum);
+    }
   }
 
   canMove(x, y, direction) { return canMoveOnGrid(this.level, this.grid, x, y, direction); }
@@ -63,6 +68,7 @@ export class LevelSimulation {
     this.events = [];
     const seconds = Math.max(0, Number(dt) || 0);
     this.elapsed += seconds;
+    if (this.activeEventTimer > 0) { this.activeEventTimer = Math.max(0, this.activeEventTimer - seconds); if (this.activeEventTimer === 0) this.activeEventId = ''; }
     if (this.graceTimer > 0) this.graceTimer = Math.max(0, this.graceTimer - seconds);
     if (this.state === 'hit') {
       this.hitTimer -= seconds;
@@ -85,9 +91,26 @@ export class LevelSimulation {
       });
     });
     this.collect();
+    this.checkLevelEvents();
     if (this.powerTimer > 0) this.powerTimer = Math.max(0, this.powerTimer - seconds);
     this.collide();
     return this.events;
+  }
+
+  checkLevelEvents() {
+    const x = Math.round(this.player.x); const y = Math.round(this.player.y);
+    this.level.events.forEach((event) => {
+      if (this.unlockedEvents.has(event.id)) return;
+      const trigger = event.trigger;
+      const matches = trigger.type === 'zone'
+        ? trigger.zones.some((zone) => x >= zone.x && x < zone.x + zone.width && y >= zone.y && y < zone.y + zone.height)
+        : trigger.type === 'direction-sequence'
+          ? trigger.sequence.length > 0 && this.directionHistory.slice(-trigger.sequence.length).join(',') === trigger.sequence.join(',')
+          : this.elapsed >= trigger.seconds;
+      if (!matches) return;
+      this.unlockedEvents.add(event.id); this.activeEventId = event.id; this.activeEventTimer = 4.5; this.score += event.reward;
+      this.events.push({ type: 'level-event', id: event.id, event: clone(event), reward: event.reward });
+    });
   }
 
   collect() {
@@ -121,6 +144,6 @@ export class LevelSimulation {
   }
 
   snapshot() {
-    return { level: this.level, player: this.player, cats: this.cats, pellets: this.pellets, powerUps: this.powerUps, elapsed: this.elapsed, powerTimer: this.powerTimer, hitTimer: this.state === 'hit' ? this.hitTimer : 0, state: this.state, lives: this.lives, score: this.score, collected: this.collected };
+    return { level: this.level, player: this.player, cats: this.cats, pellets: this.pellets, powerUps: this.powerUps, elapsed: this.elapsed, powerTimer: this.powerTimer, hitTimer: this.state === 'hit' ? this.hitTimer : 0, state: this.state, lives: this.lives, score: this.score, collected: this.collected, unlockedEvents: this.unlockedEvents, activeEventId: this.activeEventId };
   }
 }

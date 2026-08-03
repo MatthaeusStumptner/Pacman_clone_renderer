@@ -148,9 +148,17 @@ function drawStage(context, level, elapsed) {
   context.fillRect(left + 4, top + 9, width - 8, height - 9);
   context.fillStyle = '#34203f';
   context.fillRect(left + 12, top + 17, width - 24, height - 28);
+  context.save(); context.globalAlpha = 0.16;
+  zauberbergSpotlightPolygons(left, top, width, height).forEach(({ color, points }) => {
+    context.fillStyle = color; context.beginPath(); context.moveTo(...points[0]); points.slice(1).forEach((point) => context.lineTo(...point)); context.closePath(); context.fill();
+  });
+  context.restore();
   context.fillStyle = '#131018';
   context.fillRect(left + 15, top + 43, 28, 65);
   context.fillRect(left + width - 43, top + 43, 28, 65);
+  context.fillStyle = '#9d4778';
+  [left + 23, left + width - 35].forEach((speakerX) => { context.fillRect(speakerX, top + 54, 12, 12); context.fillRect(speakerX, top + 79, 12, 12); });
+  context.fillStyle = '#17101c'; context.fillRect(left + 54, top + height - 35, 31, 25); context.fillRect(left + width - 85, top + height - 35, 31, 25);
   context.fillStyle = '#ff5d93';
   context.font = '8px monospace';
   context.textAlign = 'center';
@@ -161,6 +169,13 @@ function drawStage(context, level, elapsed) {
   const bounce = Math.round(Math.sin(elapsed * 7) * 3);
   context.fillStyle = '#63d9d4';
   zauberbergNoteRectangles(left, top, width, bounce).forEach(([x, y, noteWidth, noteHeight]) => context.fillRect(x, y, noteWidth, noteHeight));
+}
+
+export function zauberbergSpotlightPolygons(left, top, width, height) {
+  return [
+    { color: '#ff4f87', points: [[left + 35, top + 20], [left + 74, top + height + 78], [left + 112, top + height + 78]] },
+    { color: '#55d9dd', points: [[left + width - 35, top + 20], [left + width - 112, top + height + 78], [left + width - 70, top + height + 78]] },
+  ];
 }
 
 export function zauberbergNoteRectangles(left, top, width, bounce = 0) {

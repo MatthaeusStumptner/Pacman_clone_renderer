@@ -87,6 +87,7 @@
       }
     },
     "decorations": { "type": "array", "items": { "$ref": "#/$defs/decoration" } },
+    "events": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/levelEvent" } },
     "source": { "type": "object" }
   },
   "$defs": {
@@ -172,6 +173,43 @@
         "type": { "enum": ["none", "bob", "pulse", "blink", "spin"] },
         "speed": { "type": "number", "minimum": 0.1, "maximum": 12 },
         "amplitude": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "eventTrigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["zone", "direction-sequence", "time"] },
+        "zones": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/rectangle" } },
+        "sequence": { "type": "array", "maxItems": 32, "items": { "enum": ["up", "down", "left", "right"] } },
+        "seconds": { "type": "number", "minimum": 0, "maximum": 3600 }
+      }
+    },
+    "eventVisual": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["kingfisher", "paw", "bell", "custom", "none"] },
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 },
+        "color": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color" },
+        "label": { "type": "string" },
+        "visibility": { "enum": ["after-trigger", "always"] }
+      }
+    },
+    "levelEvent": {
+      "type": "object",
+      "required": ["id", "name", "message", "trigger", "visual"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "kind": { "const": "easter-egg" },
+        "name": { "$ref": "#/$defs/localized" },
+        "message": { "$ref": "#/$defs/localized" },
+        "reward": { "type": "integer", "minimum": -9999, "maximum": 9999 },
+        "scope": { "enum": ["global", "level", "run"] },
+        "trigger": { "$ref": "#/$defs/eventTrigger" },
+        "visual": { "$ref": "#/$defs/eventVisual" }
       }
     },
     "decoration": {

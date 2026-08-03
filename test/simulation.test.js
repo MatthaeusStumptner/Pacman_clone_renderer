@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FixedStepLoop, LevelSimulation, createLevelDocument, selectAppearanceFrame } from '../src/index.js';
-import { zauberbergNoteRectangles } from '../src/painters/environment.js';
+import { zauberbergNoteRectangles, zauberbergSpotlightPolygons } from '../src/painters/environment.js';
 
 function openLevel(extra = {}) {
   return createLevelDocument({
@@ -53,4 +53,27 @@ test('Zauberberg note consists of stem, beam and note head and bounces as one sy
   assert.equal(base.length, 3);
   assert.deepEqual(base.map((rect) => rect.slice(2)), [[4, 21], [11, 4], [4, 7]]);
   assert.deepEqual(bounced.map((rect, index) => rect[1] - base[index][1]), [3, 3, 3]);
+});
+
+test('Zauberberg restores both original stage spotlights', () => {
+  const lights = zauberbergSpotlightPolygons(100, 50, 200, 120);
+  assert.deepEqual(lights, [
+    { color: '#ff4f87', points: [[135, 70], [174, 248], [212, 248]] },
+    { color: '#55d9dd', points: [[265, 70], [188, 248], [230, 248]] },
+  ]);
+});
+
+test('simulation unlocks zone and direction-sequence events with localized data and rewards', () => {
+  const level = openLevel({ events: [
+    { id: 'zone-event', name: { standard: 'Zone', dialect: 'Zone' }, message: { standard: 'Gefunden', dialect: 'Gfundn' }, reward: 150, trigger: { type: 'zone', zones: [{ x: 3, y: 10, width: 1, height: 1 }] }, visual: { type: 'kingfisher' } },
+    { id: 'sequence-event', name: { standard: 'Folge', dialect: 'Folgn' }, message: { standard: 'Klingeling', dialect: 'Bim bam' }, reward: 250, trigger: { type: 'direction-sequence', sequence: ['up', 'down', 'left', 'right'] }, visual: { type: 'bell' } },
+  ] });
+  const simulation = new LevelSimulation(level, { pellets: ['20,20'] });
+  let events = simulation.step(1 / 120);
+  assert.equal(events[0].id, 'zone-event'); assert.equal(simulation.score, 150);
+  ['up', 'down', 'left', 'right'].forEach((direction) => simulation.setDirection(direction));
+  events = simulation.step(1 / 120);
+  assert.equal(events.find((event) => event.id === 'sequence-event').event.message.dialect, 'Bim bam');
+  assert.equal(simulation.score, 400);
+  assert.deepEqual([...simulation.snapshot().unlockedEvents], ['zone-event', 'sequence-event']);
 });

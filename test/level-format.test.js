@@ -51,3 +51,25 @@ test('normalizes configurable actor behavior, difficulty physics and sprite anim
   assert.equal(normalized.gameplay.difficulties.normal.playerSpeed, 6.2);
   assert.equal(normalized.gameplay.difficulties.normal.catCount, 1);
 });
+
+test('normalizes localized level events, triggers, rewards and visuals', () => {
+  const level = valid();
+  level.events = [{
+    id: 'Ilz Vögl!', name: { standard: 'Eisvogel', dialect: 'Eisvogl' }, message: { standard: 'Gefunden!', dialect: 'Gfundn!' }, reward: 150,
+    trigger: { type: 'zone', zones: [{ x: -2, y: 4, width: 3, height: 1 }, { x: 8, y: 4, width: 3, height: 1 }] },
+    visual: { type: 'kingfisher', x: 0.375, y: 6, visibility: 'after-trigger' },
+  }];
+  const event = createLevelDocument(level).events[0];
+  assert.equal(event.id, 'ilz-v-gl');
+  assert.equal(event.message.dialect, 'Gfundn!');
+  assert.equal(event.reward, 150);
+  assert.deepEqual(event.trigger.zones, [{ x: 0, y: 4, width: 3, height: 1 }, { x: 8, y: 4, width: 1, height: 1 }]);
+  assert.equal(event.visual.x, 0.375);
+});
+
+test('validates unique event ids and usable direction sequences', () => {
+  const level = valid();
+  const event = { id: 'glocke', name: { standard: 'Glocke', dialect: 'Glockn' }, message: { standard: 'Bim', dialect: 'Bam' }, trigger: { type: 'direction-sequence', sequence: [] }, visual: { type: 'bell' } };
+  level.events = [event, event]; const result = validateLevelDocument(level);
+  assert.equal(result.ok, false); assert.match(result.errors.join(' '), /eindeutig/); assert.match(result.errors.join(' '), /mindestens eine Richtung/);
+});

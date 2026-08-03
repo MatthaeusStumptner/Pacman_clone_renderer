@@ -13,4 +13,6 @@ test('ships a machine-readable schema for the public level contract', async () =
   assert.ok(schema.$defs.actorBehavior);
   assert.ok(schema.$defs.difficultyProfile);
   assert.ok(schema.$defs.motionAnimation);
+  assert.ok(schema.$defs.levelEvent);
+  assert.ok(schema.properties.events);
 });
