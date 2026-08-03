@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matthaeusstumptner.github.io/franz-lola/schema/franz-lola-level.schema.json",
+  "title": "Franz & Lola Level",
+  "type": "object",
+  "required": ["kind", "schemaVersion", "id", "name", "board", "theme", "actors", "collectibles"],
+  "properties": {
+    "kind": { "const": "franz-lola-level" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "icon": { "type": "string" },
+    "name": { "$ref": "#/$defs/localized" },
+    "description": { "$ref": "#/$defs/localized" },
+    "mission": { "$ref": "#/$defs/localized" },
+    "location": {
+      "type": "object",
+      "required": ["latitude", "longitude", "area"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "area": { "type": "string" }
+      }
+    },
+    "board": {
+      "type": "object",
+      "required": ["columns", "rows", "tileSize", "tunnelRows", "walls"],
+      "properties": {
+        "columns": { "type": "integer", "minimum": 5 },
+        "rows": { "type": "integer", "minimum": 5 },
+        "tileSize": { "type": "integer", "minimum": 8 },
+        "tunnelRows": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 0 } },
+        "walls": { "type": "array", "items": { "$ref": "#/$defs/rectangle" } }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "required": ["id", "landmark", "palette"],
+      "properties": {
+        "id": { "type": "string" },
+        "landmark": { "type": "string" },
+        "palette": {
+          "type": "object",
+          "required": ["ground", "curb", "walls", "water"],
+          "properties": {
+            "ground": { "$ref": "#/$defs/colors" },
+            "curb": { "$ref": "#/$defs/color" },
+            "walls": { "$ref": "#/$defs/colors" },
+            "water": { "$ref": "#/$defs/color" }
+          }
+        }
+      }
+    },
+    "actors": {
+      "type": "object",
+      "required": ["player", "cats"],
+      "properties": {
+        "player": { "$ref": "#/$defs/actor" },
+        "cats": { "type": "array", "items": { "$ref": "#/$defs/actor" } }
+      }
+    },
+    "collectibles": {
+      "type": "object",
+      "required": ["powerUps"],
+      "properties": { "powerUps": { "type": "array", "items": { "$ref": "#/$defs/point" } } }
+    },
+    "gameplay": {
+      "type": "object",
+      "properties": {
+        "pelletSeed": { "type": "integer" },
+        "treatTargets": {
+          "type": "object",
+          "required": ["easy", "normal", "hard"],
+          "properties": {
+            "easy": { "type": "integer", "minimum": 1 },
+            "normal": { "type": "integer", "minimum": 1 },
+            "hard": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "decorations": { "type": "array", "items": { "$ref": "#/$defs/decoration" } },
+    "source": { "type": "object" }
+  },
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "colors": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/color" } },
+    "localized": {
+      "type": "object",
+      "required": ["standard", "dialect"],
+      "properties": { "standard": { "type": "string" }, "dialect": { "type": "string" } }
+    },
+    "point": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "integer" }, "y": { "type": "integer" } }
+    },
+    "rectangle": {
+      "allOf": [
+        { "$ref": "#/$defs/point" },
+        { "type": "object", "required": ["width", "height"], "properties": { "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 } } }
+      ]
+    },
+    "appearance": {
+      "type": ["object", "null"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 4, "maximum": 24 },
+        "height": { "type": "integer", "minimum": 4, "maximum": 24 },
+        "palette": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "type": "string" } },
+        "pixels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "actor": {
+      "allOf": [
+        { "$ref": "#/$defs/point" },
+        { "type": "object", "properties": { "renderer": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" } } }
+      ]
+    },
+    "decoration": {
+      "allOf": [
+        { "$ref": "#/$defs/rectangle" },
+        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" } } }
+      ]
+    }
+  }
+}

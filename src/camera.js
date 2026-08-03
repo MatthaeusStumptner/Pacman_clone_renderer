@@ -19,10 +19,18 @@ export function calculateCamera({
   };
 
   if (!enabled) {
+    const containScale = Math.min(safeViewport.width / safeWorldWidth, safeViewport.height / safeWorldHeight);
+    const width = safeWorldWidth * containScale;
+    const height = safeWorldHeight * containScale;
     return {
-      viewport: safeViewport,
+      viewport: {
+        x: safeViewport.x + (safeViewport.width - width) / 2,
+        y: safeViewport.y + (safeViewport.height - height) / 2,
+        width,
+        height,
+      },
       source: { x: 0, y: 0, width: safeWorldWidth, height: safeWorldHeight },
-      scale: Math.min(safeViewport.width / safeWorldWidth, safeViewport.height / safeWorldHeight),
+      scale: containScale,
     };
   }
 

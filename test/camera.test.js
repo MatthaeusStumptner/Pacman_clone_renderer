@@ -12,3 +12,9 @@ test('camera is centered away from edges', () => {
   const camera = calculateCamera({ worldWidth: 600, worldHeight: 600, viewport: { x: 0, y: 0, width: 300, height: 500 }, target: { x: 300, y: 300 }, zoom: 1 });
   const point = projectWorldPoint(camera, { x: 300, y: 300 }); assert.equal(point.x, 150); assert.equal(point.y, 250);
 });
+
+test('editor camera letterboxes rectangular boards without distortion', () => {
+  const camera = calculateCamera({ worldWidth: 800, worldHeight: 400, viewport: { x: 0, y: 0, width: 600, height: 600 }, enabled: false });
+  assert.deepEqual(camera.viewport, { x: 0, y: 150, width: 600, height: 300 });
+  assert.equal(camera.scale, 0.75);
+});

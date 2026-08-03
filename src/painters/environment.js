@@ -178,6 +178,46 @@ export function drawEnvironment(context, level, grid, elapsed = 0) {
   else if (level.theme.landmark === 'zauberberg') drawStage(context, level, elapsed);
   else drawDogPark(context, level, grid);
   if (level.theme.landmark === 'brahmahof-home') drawHome(context, level);
+  drawDecorations(context, level);
+}
+
+function drawDecorations(context, level) {
+  const tile = level.board.tileSize;
+  level.decorations.forEach((item) => {
+    const left = item.x * tile;
+    const top = item.y * tile;
+    const width = item.width * tile;
+    const height = item.height * tile;
+    context.save();
+    context.fillStyle = item.color;
+    if (item.type === 'tree') {
+      context.fillStyle = '#5c3b2a'; context.fillRect(left + width * 0.43, top + height * 0.48, Math.max(2, width * 0.14), height * 0.42);
+      context.fillStyle = item.color; context.fillRect(left + width * 0.2, top + height * 0.08, width * 0.6, height * 0.55);
+    } else if (item.type === 'bench') {
+      context.fillRect(left + width * 0.12, top + height * 0.46, width * 0.76, Math.max(3, height * 0.16));
+      context.fillRect(left + width * 0.2, top + height * 0.62, 3, height * 0.22); context.fillRect(left + width * 0.76, top + height * 0.62, 3, height * 0.22);
+    } else if (item.type === 'lamp') {
+      context.fillRect(left + width * 0.47, top + height * 0.25, Math.max(2, width * 0.08), height * 0.65);
+      context.fillStyle = '#f5c451'; context.fillRect(left + width * 0.32, top + height * 0.08, width * 0.38, height * 0.25);
+    } else if (item.type === 'flower') {
+      context.fillRect(left + width * 0.46, top + height * 0.42, 2, height * 0.4);
+      context.fillStyle = '#f5c451'; context.fillRect(left + width * 0.32, top + height * 0.22, width * 0.36, height * 0.3);
+    } else if (item.type === 'water') {
+      context.globalAlpha = 0.72; context.fillRect(left + 2, top + 2, width - 4, height - 4);
+      context.fillStyle = 'rgba(255,255,255,.28)'; context.fillRect(left + width * 0.15, top + height * 0.38, width * 0.55, 2);
+    } else if (item.type === 'rock') {
+      context.fillRect(left + width * 0.2, top + height * 0.3, width * 0.62, height * 0.5);
+    } else {
+      context.font = `${Math.max(8, Math.floor(Math.min(width, height) * 0.55))}px monospace`;
+      context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(item.label || '◆', left + width / 2, top + height / 2);
+    }
+    if (item.type === 'sign') {
+      context.fillRect(left + width * 0.46, top + height * 0.48, Math.max(2, width * 0.08), height * 0.42);
+      context.fillRect(left + width * 0.08, top + height * 0.08, width * 0.84, height * 0.45);
+      context.fillStyle = '#071016'; context.font = `${Math.max(5, Math.floor(tile * 0.22))}px monospace`; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(item.label.slice(0, 12), left + width / 2, top + height * 0.3);
+    }
+    context.restore();
+  });
 }
 
 export function drawEditorGrid(context, level) {

@@ -4,6 +4,24 @@ const DIRECTIONS = Object.freeze({
 });
 const directionOf = (direction) => typeof direction === 'string' ? DIRECTIONS[direction] ?? DIRECTIONS.none : direction?.name ? direction : DIRECTIONS.none;
 
+function drawPixelAppearance(context, actor, tileSize) {
+  const appearance = actor.appearance;
+  if (!appearance) return false;
+  const scale = Math.max(1, Math.floor((tileSize * 0.9) / Math.max(appearance.width, appearance.height)));
+  const width = appearance.width * scale;
+  const height = appearance.height * scale;
+  const left = Math.round(actor.x * tileSize + (tileSize - width) / 2);
+  const top = Math.round(actor.y * tileSize + (tileSize - height) / 2);
+  appearance.pixels.forEach((row, y) => [...row].forEach((token, x) => {
+    const paletteIndex = Number.parseInt(token, 36);
+    const pixelColor = appearance.palette[paletteIndex];
+    if (!pixelColor || pixelColor === 'transparent') return;
+    context.fillStyle = pixelColor;
+    context.fillRect(left + x * scale, top + y * scale, scale, scale);
+  }));
+  return true;
+}
+
 function drawDog(context, px, py, direction, elapsed) {
   const wiggle = Math.sin(elapsed * 18) > 0 ? 1 : -1;
   context.fillStyle = 'rgba(1, 5, 8, 0.4)'; context.fillRect(px - 7, py + 5, 14, 3);
@@ -17,6 +35,7 @@ function drawDog(context, px, py, direction, elapsed) {
 }
 
 export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 0 } = {}) {
+  if (drawPixelAppearance(context, player, tileSize)) return;
   const px = Math.round(player.x * tileSize + tileSize / 2);
   const py = Math.round(player.y * tileSize + tileSize / 2);
   const current = directionOf(player.direction ?? player.dir);
@@ -41,6 +60,7 @@ export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 
 
 export function drawCat(context, cat, tileSize, { frightened = false, frightenedTime = 0 } = {}) {
   if (cat.respawnTimer > 0 && Math.floor(cat.respawnTimer * 8) % 2 === 0) return;
+  if (!frightened && drawPixelAppearance(context, cat, tileSize)) return;
   const px = Math.round(cat.x * tileSize + tileSize / 2); const py = Math.round(cat.y * tileSize + tileSize / 2);
   const flashing = frightened && frightenedTime < 2 && Math.floor(frightenedTime * 8) % 2;
   const body = frightened ? (flashing ? '#f3eee0' : '#2379a3') : cat.color; const accent = frightened ? '#174e77' : cat.accent;

@@ -19,6 +19,7 @@ const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(valu
 const integer = (value, fallback) => Math.round(finite(value, fallback));
 const text = (value, fallback = '') => typeof value === 'string' ? value : fallback;
 const color = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value ?? '') ? value : fallback;
+const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
 function normalizePoint(point, fallback) {
   return {
@@ -34,15 +35,45 @@ function normalizeLocalized(value, fallback) {
   };
 }
 
+function normalizeAppearance(value) {
+  if (!value || typeof value !== 'object') return null;
+  const width = clamp(integer(value.width, 8), 4, 24);
+  const height = clamp(integer(value.height, 8), 4, 24);
+  const palette = (Array.isArray(value.palette) ? value.palette : ['#000000', '#f4eee0'])
+    .slice(0, 10)
+    .map((entry, index) => index === 0 && entry === 'transparent' ? entry : color(entry, index === 0 ? '#000000' : '#f4eee0'));
+  const pixels = Array.from({ length: height }, (_, y) => {
+    const row = typeof value.pixels?.[y] === 'string' ? value.pixels[y] : '';
+    return Array.from({ length: width }, (_, x) => {
+      const digit = Number.parseInt(row[x] ?? '0', 36);
+      return Number.isFinite(digit) && digit >= 0 && digit < palette.length ? digit.toString(36) : '0';
+    }).join('');
+  });
+  return { width, height, palette, pixels };
+}
+
+function normalizeDecoration(value, index, columns, rows) {
+  const allowedTypes = ['tree', 'bench', 'lamp', 'flower', 'sign', 'rock', 'water', 'custom'];
+  const type = allowedTypes.includes(value?.type) ? value.type : 'custom';
+  return {
+    id: text(value?.id, `decoration-${index + 1}`),
+    type,
+    x: clamp(integer(value?.x, 1), 0, columns - 1),
+    y: clamp(integer(value?.y, 1), 0, rows - 1),
+    width: clamp(integer(value?.width, 1), 1, columns),
+    height: clamp(integer(value?.height, 1), 1, rows),
+    color: color(value?.color, '#55d9dd'),
+    label: text(value?.label, type === 'custom' ? '◆' : ''),
+  };
+}
+
 export function createLevelDocument(input = {}) {
   const columns = Math.max(5, integer(input.board?.columns, 25));
   const rows = Math.max(5, integer(input.board?.rows, 25));
   const tileSize = Math.max(8, integer(input.board?.tileSize, 24));
   const defaultPlayer = { x: Math.floor(columns / 2), y: Math.max(1, rows - 5) };
   const walls = Array.isArray(input.board?.walls) ? input.board.walls : [];
-  const cats = Array.isArray(input.actors?.cats) && input.actors.cats.length
-    ? input.actors.cats
-    : DEFAULT_CATS;
+  const cats = Array.isArray(input.actors?.cats) ? input.actors.cats : DEFAULT_CATS;
   const powerUps = Array.isArray(input.collectibles?.powerUps)
     ? input.collectibles.powerUps
     : [{ x: 1, y: 1 }, { x: columns - 2, y: 1 }, { x: 1, y: rows - 2 }, { x: columns - 2, y: rows - 2 }];
@@ -88,17 +119,35 @@ export function createLevelDocument(input = {}) {
       player: {
         ...normalizePoint(input.actors?.player, defaultPlayer),
         renderer: text(input.actors?.player?.renderer, 'franz-lola'),
+        appearance: normalizeAppearance(input.actors?.player?.appearance),
       },
       cats: cats.map((cat, index) => ({
         ...normalizePoint(cat, DEFAULT_CATS[index % DEFAULT_CATS.length]),
         renderer: text(cat?.renderer, 'cat'),
         color: color(cat?.color, DEFAULT_CATS[index % DEFAULT_CATS.length].color),
         accent: color(cat?.accent, DEFAULT_CATS[index % DEFAULT_CATS.length].accent),
+        appearance: normalizeAppearance(cat?.appearance),
       })),
     },
     collectibles: {
       powerUps: powerUps.map((point) => normalizePoint(point, { x: 1, y: 1 })),
     },
+    gameplay: {
+      pelletSeed: integer(input.gameplay?.pelletSeed, 0),
+      treatTargets: {
+        easy: clamp(integer(input.gameplay?.treatTargets?.easy, 70), 1, 999),
+        normal: clamp(integer(input.gameplay?.treatTargets?.normal, 110), 1, 999),
+        hard: clamp(integer(input.gameplay?.treatTargets?.hard, 160), 1, 999),
+      },
+    },
+    source: {
+      catalog: text(input.source?.catalog, ''),
+      gameLayout: integer(input.source?.gameLayout, -1),
+      markerClass: text(input.source?.markerClass, ''),
+      home: Boolean(input.source?.home),
+    },
+    decorations: (Array.isArray(input.decorations) ? input.decorations : [])
+      .map((entry, index) => normalizeDecoration(entry, index, columns, rows)),
   };
 }
 
@@ -156,6 +205,7 @@ export function reachableTileKeys(levelInput, startInput) {
 
 export function validateLevelDocument(input) {
   const errors = [];
+  const warnings = [];
   if (!input || typeof input !== 'object' || Array.isArray(input)) errors.push('Das Level muss ein JSON-Objekt sein.');
   const level = createLevelDocument(input ?? {});
   if (input?.kind !== LEVEL_DOCUMENT_KIND) errors.push(`kind muss "${LEVEL_DOCUMENT_KIND}" sein.`);
@@ -173,7 +223,31 @@ export function validateLevelDocument(input) {
   level.collectibles.powerUps.forEach((point, index) => {
     if (!reachable.has(tileKey(point.x, point.y))) errors.push(`Power-up ${index + 1} ist nicht erreichbar.`);
   });
-  return { ok: errors.length === 0, errors, value: level };
+  const powerKeys = level.collectibles.powerUps.map((point) => tileKey(point.x, point.y));
+  if (new Set(powerKeys).size !== powerKeys.length) warnings.push('Mehrere Power-ups liegen auf demselben Feld.');
+  const openInterior = [...reachable].filter((key) => {
+    const [x, y] = key.split(',').map(Number);
+    return x > 0 && x < level.board.columns - 1 && y > 0 && y < level.board.rows - 1;
+  }).length;
+  const maximumTarget = Math.max(...Object.values(level.gameplay.treatTargets));
+  if (openInterior < maximumTarget) warnings.push(`Für ${maximumTarget} Guttis sind nur ${openInterior} erreichbare Innenfelder vorhanden.`);
+  level.board.walls.forEach((wall, index) => {
+    if (wall.x < 0 || wall.y < 0 || wall.x + wall.width > level.board.columns || wall.y + wall.height > level.board.rows) {
+      warnings.push(`Wand ${index + 1} ragt über das Spielfeld hinaus und wird abgeschnitten.`);
+    }
+  });
+  level.decorations.forEach((item, index) => {
+    if (item.x + item.width > level.board.columns || item.y + item.height > level.board.rows) {
+      warnings.push(`Dekoration ${index + 1} ragt über das Spielfeld hinaus.`);
+    }
+  });
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings,
+    metrics: { reachableTiles: reachable.size, openInteriorTiles: openInterior, wallRectangles: level.board.walls.length },
+    value: level,
+  };
 }
 
 export function parseLevelDocument(source) {
