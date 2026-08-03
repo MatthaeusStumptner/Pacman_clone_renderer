@@ -75,6 +75,14 @@
             "normal": { "type": "integer", "minimum": 1 },
             "hard": { "type": "integer", "minimum": 1 }
           }
+        },
+        "difficulties": {
+          "type": "object",
+          "properties": {
+            "easy": { "$ref": "#/$defs/difficultyProfile" },
+            "normal": { "$ref": "#/$defs/difficultyProfile" },
+            "hard": { "$ref": "#/$defs/difficultyProfile" }
+          }
         }
       }
     },
@@ -106,19 +114,70 @@
         "width": { "type": "integer", "minimum": 4, "maximum": 24 },
         "height": { "type": "integer", "minimum": 4, "maximum": 24 },
         "palette": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "type": "string" } },
-        "pixels": { "type": "array", "items": { "type": "string" } }
+        "pixels": { "type": "array", "items": { "type": "string" } },
+        "animations": { "type": "array", "maxItems": 24, "items": { "$ref": "#/$defs/spriteAnimation" } }
+      }
+    },
+    "animationFrame": {
+      "type": "object",
+      "required": ["pixels"],
+      "properties": { "pixels": { "type": "array", "items": { "type": "string" } } }
+    },
+    "spriteAnimation": {
+      "type": "object",
+      "required": ["id", "frames"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "fps": { "type": "number", "minimum": 0.25, "maximum": 30 },
+        "loop": { "type": "boolean" },
+        "frames": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/animationFrame" } }
+      }
+    },
+    "actorBehavior": {
+      "type": "object",
+      "properties": {
+        "controller": { "enum": ["user", "autopilot", "patrol", "stationary"] },
+        "strategy": { "enum": ["chase", "ambush", "scatter-chase", "scatter", "guard", "random", "stationary"] },
+        "speedMultiplier": { "type": "number", "minimum": 0.1, "maximum": 4 },
+        "lookAhead": { "type": "number", "minimum": 0, "maximum": 12 },
+        "wanderMultiplier": { "type": "number", "minimum": 0, "maximum": 12 },
+        "wander": { "type": "number", "minimum": 0, "maximum": 30 },
+        "respawnDelay": { "type": "number", "minimum": 0, "maximum": 20 },
+        "target": { "$ref": "#/$defs/point" }
+      }
+    },
+    "difficultyProfile": {
+      "type": "object",
+      "properties": {
+        "playerSpeed": { "type": "number", "minimum": 0.1 },
+        "catSpeed": { "type": "number", "minimum": 0.1 },
+        "frightSpeed": { "type": "number", "minimum": 0.1 },
+        "catCount": { "type": "integer", "minimum": 0 },
+        "lives": { "type": "integer", "minimum": 1 },
+        "powerDuration": { "type": "number", "minimum": 0.1 },
+        "target": { "type": "integer", "minimum": 1 },
+        "wander": { "type": "number", "minimum": 0 },
+        "grace": { "type": "number", "minimum": 0 }
       }
     },
     "actor": {
       "allOf": [
         { "$ref": "#/$defs/point" },
-        { "type": "object", "properties": { "renderer": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" } } }
+        { "type": "object", "properties": { "renderer": { "type": "string" }, "animation": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" }, "behavior": { "$ref": "#/$defs/actorBehavior" } } }
       ]
+    },
+    "motionAnimation": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["none", "bob", "pulse", "blink", "spin"] },
+        "speed": { "type": "number", "minimum": 0.1, "maximum": 12 },
+        "amplitude": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
     },
     "decoration": {
       "allOf": [
         { "$ref": "#/$defs/rectangle" },
-        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" } } }
+        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" } } }
       ]
     }
   }

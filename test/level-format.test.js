@@ -34,3 +34,20 @@ test('preserves an intentionally empty cat list', () => {
   const level = valid(); level.actors.cats = [];
   assert.deepEqual(createLevelDocument(level).actors.cats, []);
 });
+
+test('normalizes configurable actor behavior, difficulty physics and sprite animations', () => {
+  const level = valid();
+  level.actors.player.behavior = { controller: 'autopilot', speedMultiplier: 1.4 };
+  level.actors.cats[0].behavior = { strategy: 'guard', speedMultiplier: 0.8, target: { x: 2, y: 6 } };
+  level.actors.cats[0].appearance = {
+    width: 4, height: 4, palette: ['transparent', '#ff0000'], pixels: ['0000', '0110', '0110', '0000'],
+    animations: [{ id: 'walk', fps: 8, loop: true, frames: [{ pixels: ['0000', '0110', '0110', '0000'] }, { pixels: ['1001', '0110', '0110', '1001'] }] }],
+  };
+  level.gameplay.difficulties = { normal: { playerSpeed: 6.2, catCount: 1 } };
+  const normalized = createLevelDocument(level);
+  assert.equal(normalized.actors.player.behavior.controller, 'autopilot');
+  assert.equal(normalized.actors.cats[0].behavior.strategy, 'guard');
+  assert.equal(normalized.actors.cats[0].appearance.animations[0].frames.length, 2);
+  assert.equal(normalized.gameplay.difficulties.normal.playerSpeed, 6.2);
+  assert.equal(normalized.gameplay.difficulties.normal.catCount, 1);
+});

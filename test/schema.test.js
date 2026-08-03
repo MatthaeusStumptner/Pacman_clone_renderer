@@ -9,4 +9,8 @@ test('ships a machine-readable schema for the public level contract', async () =
   assert.ok(schema.required.includes('board'));
   assert.ok(schema.$defs.decoration);
   assert.ok(schema.$defs.appearance);
+  assert.ok(schema.$defs.appearance.properties.animations);
+  assert.ok(schema.$defs.actorBehavior);
+  assert.ok(schema.$defs.difficultyProfile);
+  assert.ok(schema.$defs.motionAnimation);
 });

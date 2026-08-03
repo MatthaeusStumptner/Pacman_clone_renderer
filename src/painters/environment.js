@@ -160,7 +160,15 @@ function drawStage(context, level, elapsed) {
   context.fillText('ROCK · PUNK · METAL', left + width / 2, top + 49);
   const bounce = Math.round(Math.sin(elapsed * 7) * 3);
   context.fillStyle = '#63d9d4';
-  context.fillRect(left + width / 2 - 2, top + 68 + bounce, 4, 21);
+  zauberbergNoteRectangles(left, top, width, bounce).forEach(([x, y, noteWidth, noteHeight]) => context.fillRect(x, y, noteWidth, noteHeight));
+}
+
+export function zauberbergNoteRectangles(left, top, width, bounce = 0) {
+  return [
+    [left + width / 2 - 2, top + 68 + bounce, 4, 21],
+    [left + width / 2 + 2, top + 68 + bounce, 11, 4],
+    [left + width / 2 + 9, top + 71 + bounce, 4, 7],
+  ];
 }
 
 export function drawEnvironment(context, level, grid, elapsed = 0) {
@@ -178,10 +186,10 @@ export function drawEnvironment(context, level, grid, elapsed = 0) {
   else if (level.theme.landmark === 'zauberberg') drawStage(context, level, elapsed);
   else drawDogPark(context, level, grid);
   if (level.theme.landmark === 'brahmahof-home') drawHome(context, level);
-  drawDecorations(context, level);
+  drawDecorations(context, level, elapsed);
 }
 
-function drawDecorations(context, level) {
+function drawDecorations(context, level, elapsed) {
   const tile = level.board.tileSize;
   level.decorations.forEach((item) => {
     const left = item.x * tile;
@@ -189,6 +197,15 @@ function drawDecorations(context, level) {
     const width = item.width * tile;
     const height = item.height * tile;
     context.save();
+    const animation = item.animation ?? { type: 'none', speed: 1, amplitude: 0.15 };
+    const phase = elapsed * Math.PI * 2 * animation.speed;
+    const centerX = left + width / 2; const centerY = top + height / 2;
+    context.translate(centerX, centerY);
+    if (animation.type === 'bob') context.translate(0, Math.sin(phase) * tile * animation.amplitude);
+    if (animation.type === 'pulse') { const scale = 1 + Math.sin(phase) * animation.amplitude; context.scale(scale, scale); }
+    if (animation.type === 'spin') context.rotate(phase * animation.amplitude);
+    if (animation.type === 'blink') context.globalAlpha = Math.sin(phase) > 0 ? 1 : Math.max(0.08, 1 - animation.amplitude);
+    context.translate(-centerX, -centerY);
     context.fillStyle = item.color;
     if (item.type === 'tree') {
       context.fillStyle = '#5c3b2a'; context.fillRect(left + width * 0.43, top + height * 0.48, Math.max(2, width * 0.14), height * 0.42);

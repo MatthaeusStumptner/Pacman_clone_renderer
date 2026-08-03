@@ -1,3 +1,5 @@
+import { DEFAULT_DIFFICULTY_PROFILES } from './simulation/profiles.js';
+
 export const LEVEL_DOCUMENT_KIND = 'franz-lola-level';
 export const LEVEL_FORMAT_VERSION = 1;
 
@@ -35,6 +37,38 @@ function normalizeLocalized(value, fallback) {
   };
 }
 
+function normalizeBehavior(value, kind, index = 0) {
+  const input = value && typeof value === 'object' ? value : {};
+  if (kind === 'player') {
+    const controllers = ['user', 'autopilot', 'patrol', 'stationary'];
+    return {
+      controller: controllers.includes(input.controller) ? input.controller : 'user',
+      speedMultiplier: clamp(finite(input.speedMultiplier, 1), 0.1, 4),
+    };
+  }
+  const strategies = ['chase', 'ambush', 'scatter-chase', 'scatter', 'guard', 'random', 'stationary'];
+  const fallbackStrategy = index === 1 ? 'ambush' : index === 2 ? 'scatter-chase' : 'chase';
+  return {
+    strategy: strategies.includes(input.strategy) ? input.strategy : fallbackStrategy,
+    speedMultiplier: clamp(finite(input.speedMultiplier, 1), 0.1, 4),
+    lookAhead: clamp(integer(input.lookAhead, index === 1 ? 3 : 0), 0, 12),
+    wanderMultiplier: clamp(finite(input.wanderMultiplier, index + 1), 0, 12),
+    wander: clamp(finite(input.wander, 0), 0, 30),
+    respawnDelay: clamp(finite(input.respawnDelay, index * 0.9), 0, 20),
+    target: normalizePoint(input.target, { x: 22, y: 22 }),
+  };
+}
+
+function normalizePixels(rows, width, height, paletteLength) {
+  return Array.from({ length: height }, (_, y) => {
+    const row = typeof rows?.[y] === 'string' ? rows[y] : '';
+    return Array.from({ length: width }, (_, x) => {
+      const digit = Number.parseInt(row[x] ?? '0', 36);
+      return Number.isFinite(digit) && digit >= 0 && digit < paletteLength ? digit.toString(36) : '0';
+    }).join('');
+  });
+}
+
 function normalizeAppearance(value) {
   if (!value || typeof value !== 'object') return null;
   const width = clamp(integer(value.width, 8), 4, 24);
@@ -42,14 +76,16 @@ function normalizeAppearance(value) {
   const palette = (Array.isArray(value.palette) ? value.palette : ['#000000', '#f4eee0'])
     .slice(0, 10)
     .map((entry, index) => index === 0 && entry === 'transparent' ? entry : color(entry, index === 0 ? '#000000' : '#f4eee0'));
-  const pixels = Array.from({ length: height }, (_, y) => {
-    const row = typeof value.pixels?.[y] === 'string' ? value.pixels[y] : '';
-    return Array.from({ length: width }, (_, x) => {
-      const digit = Number.parseInt(row[x] ?? '0', 36);
-      return Number.isFinite(digit) && digit >= 0 && digit < palette.length ? digit.toString(36) : '0';
-    }).join('');
-  });
-  return { width, height, palette, pixels };
+  const pixels = normalizePixels(value.pixels, width, height, palette.length);
+  const animations = (Array.isArray(value.animations) ? value.animations : []).slice(0, 24).map((animation, index) => ({
+    id: text(animation?.id, `animation-${index + 1}`).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-') || `animation-${index + 1}`,
+    fps: clamp(finite(animation?.fps, 6), 0.25, 30),
+    loop: animation?.loop !== false,
+    frames: (Array.isArray(animation?.frames) && animation.frames.length ? animation.frames : [{ pixels }])
+      .slice(0, 64)
+      .map((frame) => ({ pixels: normalizePixels(frame?.pixels ?? frame, width, height, palette.length) })),
+  }));
+  return { width, height, palette, pixels, animations };
 }
 
 function normalizeDecoration(value, index, columns, rows) {
@@ -64,6 +100,24 @@ function normalizeDecoration(value, index, columns, rows) {
     height: clamp(integer(value?.height, 1), 1, rows),
     color: color(value?.color, '#55d9dd'),
     label: text(value?.label, type === 'custom' ? '◆' : ''),
+    animation: {
+      type: ['none', 'bob', 'pulse', 'blink', 'spin'].includes(value?.animation?.type) ? value.animation.type : 'none',
+      speed: clamp(finite(value?.animation?.speed, 1), 0.1, 12),
+      amplitude: clamp(finite(value?.animation?.amplitude, 0.15), 0, 1),
+    },
+  };
+}
+
+function normalizeDifficultyProfile(value, fallback) {
+  return {
+    playerSpeed: clamp(finite(value?.playerSpeed, fallback.playerSpeed), 0.1, 20),
+    catSpeed: clamp(finite(value?.catSpeed, fallback.catSpeed), 0.1, 20),
+    frightenedSpeed: clamp(finite(value?.frightenedSpeed, fallback.frightenedSpeed), 0.1, 20),
+    catCount: clamp(integer(value?.catCount, fallback.catCount), 0, 12),
+    lives: clamp(integer(value?.lives, fallback.lives), 1, 99),
+    powerDuration: clamp(finite(value?.powerDuration, fallback.powerDuration), 0.1, 120),
+    wander: clamp(finite(value?.wander, fallback.wander), 0, 30),
+    grace: clamp(finite(value?.grace, fallback.grace), 0, 30),
   };
 }
 
@@ -119,14 +173,18 @@ export function createLevelDocument(input = {}) {
       player: {
         ...normalizePoint(input.actors?.player, defaultPlayer),
         renderer: text(input.actors?.player?.renderer, 'franz-lola'),
+        animation: text(input.actors?.player?.animation, ''),
         appearance: normalizeAppearance(input.actors?.player?.appearance),
+        behavior: normalizeBehavior(input.actors?.player?.behavior, 'player'),
       },
       cats: cats.map((cat, index) => ({
         ...normalizePoint(cat, DEFAULT_CATS[index % DEFAULT_CATS.length]),
         renderer: text(cat?.renderer, 'cat'),
+        animation: text(cat?.animation, ''),
         color: color(cat?.color, DEFAULT_CATS[index % DEFAULT_CATS.length].color),
         accent: color(cat?.accent, DEFAULT_CATS[index % DEFAULT_CATS.length].accent),
         appearance: normalizeAppearance(cat?.appearance),
+        behavior: normalizeBehavior(cat?.behavior, 'cat', index),
       })),
     },
     collectibles: {
@@ -139,6 +197,7 @@ export function createLevelDocument(input = {}) {
         normal: clamp(integer(input.gameplay?.treatTargets?.normal, 110), 1, 999),
         hard: clamp(integer(input.gameplay?.treatTargets?.hard, 160), 1, 999),
       },
+      difficulties: Object.fromEntries(Object.entries(DEFAULT_DIFFICULTY_PROFILES).map(([name, fallback]) => [name, normalizeDifficultyProfile(input.gameplay?.difficulties?.[name], fallback)])),
     },
     source: {
       catalog: text(input.source?.catalog, ''),
