@@ -35,6 +35,19 @@ test('preserves an intentionally empty cat list', () => {
   assert.deepEqual(createLevelDocument(level).actors.cats, []);
 });
 
+test('preserves the complete base36 palette used by editable Franz and Lola sprites', () => {
+  const level = valid();
+  level.actors.player.appearance = {
+    width: 4,
+    height: 4,
+    palette: ['transparent', ...Array.from({ length: 11 }, (_, index) => `#${(index + 1).toString(16).padStart(6, '0')}`)],
+    pixels: ['0ab0', '1ab1', '1ab1', '0ab0'],
+  };
+  const appearance = createLevelDocument(level).actors.player.appearance;
+  assert.equal(appearance.palette.length, 12);
+  assert.deepEqual(appearance.pixels, ['0ab0', '1ab1', '1ab1', '0ab0']);
+});
+
 test('normalizes configurable actor behavior, difficulty physics and sprite animations', () => {
   const level = valid();
   level.actors.player.behavior = { controller: 'autopilot', speedMultiplier: 1.4 };

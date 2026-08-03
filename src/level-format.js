@@ -74,7 +74,7 @@ function normalizeAppearance(value) {
   const width = clamp(integer(value.width, 8), 4, 24);
   const height = clamp(integer(value.height, 8), 4, 24);
   const palette = (Array.isArray(value.palette) ? value.palette : ['#000000', '#f4eee0'])
-    .slice(0, 10)
+    .slice(0, 36)
     .map((entry, index) => index === 0 && entry === 'transparent' ? entry : color(entry, index === 0 ? '#000000' : '#f4eee0'));
   const pixels = normalizePixels(value.pixels, width, height, palette.length);
   const animations = (Array.isArray(value.animations) ? value.animations : []).slice(0, 24).map((animation, index) => ({
