@@ -1,0 +1,24 @@
+{
+  "name": "@franz-lola/pixel-renderer",
+  "version": "1.0.0",
+  "description": "Shared pixel-art renderer and level format for Franz & Lola games and tools.",
+  "type": "module",
+  "private": false,
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "vite": "^6.4.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

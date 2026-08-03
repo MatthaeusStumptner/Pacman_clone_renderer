@@ -1,0 +1,186 @@
+export const LEVEL_DOCUMENT_KIND = 'franz-lola-level';
+export const LEVEL_FORMAT_VERSION = 1;
+
+const DEFAULT_PALETTE = Object.freeze({
+  ground: ['#17262c', '#19282f', '#15242b', '#1b2a30'],
+  curb: '#345b61',
+  walls: ['#174150', '#194958', '#293f4b', '#3a3f48'],
+  water: '#0a5368',
+});
+
+const DEFAULT_CATS = Object.freeze([
+  { x: 11, y: 12, color: '#ff6b5f', accent: '#9e302e' },
+  { x: 12, y: 12, color: '#f2a65a', accent: '#a6532c' },
+  { x: 13, y: 12, color: '#b792e8', accent: '#66509d' },
+]);
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const integer = (value, fallback) => Math.round(finite(value, fallback));
+const text = (value, fallback = '') => typeof value === 'string' ? value : fallback;
+const color = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value ?? '') ? value : fallback;
+
+function normalizePoint(point, fallback) {
+  return {
+    x: integer(point?.x, fallback.x),
+    y: integer(point?.y, fallback.y),
+  };
+}
+
+function normalizeLocalized(value, fallback) {
+  return {
+    standard: text(value?.standard, fallback),
+    dialect: text(value?.dialect, value?.standard ?? fallback),
+  };
+}
+
+export function createLevelDocument(input = {}) {
+  const columns = Math.max(5, integer(input.board?.columns, 25));
+  const rows = Math.max(5, integer(input.board?.rows, 25));
+  const tileSize = Math.max(8, integer(input.board?.tileSize, 24));
+  const defaultPlayer = { x: Math.floor(columns / 2), y: Math.max(1, rows - 5) };
+  const walls = Array.isArray(input.board?.walls) ? input.board.walls : [];
+  const cats = Array.isArray(input.actors?.cats) && input.actors.cats.length
+    ? input.actors.cats
+    : DEFAULT_CATS;
+  const powerUps = Array.isArray(input.collectibles?.powerUps)
+    ? input.collectibles.powerUps
+    : [{ x: 1, y: 1 }, { x: columns - 2, y: 1 }, { x: 1, y: rows - 2 }, { x: columns - 2, y: rows - 2 }];
+
+  return {
+    kind: LEVEL_DOCUMENT_KIND,
+    schemaVersion: LEVEL_FORMAT_VERSION,
+    id: text(input.id, 'new-level').trim() || 'new-level',
+    icon: text(input.icon, '◆'),
+    name: normalizeLocalized(input.name, 'Neues Level'),
+    description: normalizeLocalized(input.description, 'Ein neuer Ort für Franz und Lola.'),
+    mission: normalizeLocalized(input.mission, 'Eine neue Gassi-Runde'),
+    location: {
+      latitude: finite(input.location?.latitude, 48.574),
+      longitude: finite(input.location?.longitude, 13.466),
+      area: text(input.location?.area, 'PASSAU'),
+    },
+    board: {
+      columns,
+      rows,
+      tileSize,
+      tunnelRows: [...new Set((Array.isArray(input.board?.tunnelRows) ? input.board.tunnelRows : [Math.floor(rows / 2)])
+        .map((row) => integer(row, -1))
+        .filter((row) => row >= 0 && row < rows))],
+      walls: walls.map((wall) => ({
+        x: integer(wall?.x, 1),
+        y: integer(wall?.y, 1),
+        width: Math.max(1, integer(wall?.width, 1)),
+        height: Math.max(1, integer(wall?.height, 1)),
+      })),
+    },
+    theme: {
+      id: text(input.theme?.id, 'neighborhood'),
+      landmark: text(input.theme?.landmark, 'dog-park'),
+      palette: {
+        ground: Array.from({ length: 4 }, (_, index) => color(input.theme?.palette?.ground?.[index], DEFAULT_PALETTE.ground[index])),
+        curb: color(input.theme?.palette?.curb, DEFAULT_PALETTE.curb),
+        walls: Array.from({ length: 4 }, (_, index) => color(input.theme?.palette?.walls?.[index], DEFAULT_PALETTE.walls[index])),
+        water: color(input.theme?.palette?.water, DEFAULT_PALETTE.water),
+      },
+    },
+    actors: {
+      player: {
+        ...normalizePoint(input.actors?.player, defaultPlayer),
+        renderer: text(input.actors?.player?.renderer, 'franz-lola'),
+      },
+      cats: cats.map((cat, index) => ({
+        ...normalizePoint(cat, DEFAULT_CATS[index % DEFAULT_CATS.length]),
+        renderer: text(cat?.renderer, 'cat'),
+        color: color(cat?.color, DEFAULT_CATS[index % DEFAULT_CATS.length].color),
+        accent: color(cat?.accent, DEFAULT_CATS[index % DEFAULT_CATS.length].accent),
+      })),
+    },
+    collectibles: {
+      powerUps: powerUps.map((point) => normalizePoint(point, { x: 1, y: 1 })),
+    },
+  };
+}
+
+export function tileKey(x, y) {
+  return `${x},${y}`;
+}
+
+export function compileWallGrid(levelInput) {
+  const level = createLevelDocument(levelInput);
+  const { columns, rows, tunnelRows, walls } = level.board;
+  const grid = Array.from({ length: rows }, (_, y) =>
+    Array.from({ length: columns }, (_, x) => x === 0 || y === 0 || x === columns - 1 || y === rows - 1),
+  );
+  tunnelRows.forEach((row) => {
+    grid[row][0] = false;
+    grid[row][columns - 1] = false;
+  });
+  walls.forEach((wall) => {
+    const right = Math.min(columns, wall.x + wall.width);
+    const bottom = Math.min(rows, wall.y + wall.height);
+    for (let y = Math.max(0, wall.y); y < bottom; y += 1) {
+      for (let x = Math.max(0, wall.x); x < right; x += 1) grid[y][x] = true;
+    }
+  });
+  return grid;
+}
+
+export function reachableTileKeys(levelInput, startInput) {
+  const level = createLevelDocument(levelInput);
+  const grid = compileWallGrid(level);
+  const { columns, rows, tunnelRows } = level.board;
+  const start = normalizePoint(startInput ?? level.actors.player, level.actors.player);
+  if (start.x < 0 || start.x >= columns || start.y < 0 || start.y >= rows || grid[start.y][start.x]) return new Set();
+  const visited = new Set([tileKey(start.x, start.y)]);
+  const queue = [start];
+  const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    directions.forEach(([dx, dy]) => {
+      let x = current.x + dx;
+      const y = current.y + dy;
+      if (y < 0 || y >= rows) return;
+      if (x < 0 || x >= columns) {
+        if (!tunnelRows.includes(y)) return;
+        x = x < 0 ? columns - 1 : 0;
+      }
+      const key = tileKey(x, y);
+      if (visited.has(key) || grid[y][x]) return;
+      visited.add(key);
+      queue.push({ x, y });
+    });
+  }
+  return visited;
+}
+
+export function validateLevelDocument(input) {
+  const errors = [];
+  if (!input || typeof input !== 'object' || Array.isArray(input)) errors.push('Das Level muss ein JSON-Objekt sein.');
+  const level = createLevelDocument(input ?? {});
+  if (input?.kind !== LEVEL_DOCUMENT_KIND) errors.push(`kind muss "${LEVEL_DOCUMENT_KIND}" sein.`);
+  if (Number(input?.schemaVersion) !== LEVEL_FORMAT_VERSION) errors.push(`schemaVersion muss ${LEVEL_FORMAT_VERSION} sein.`);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(level.id)) errors.push('id darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.');
+  const grid = compileWallGrid(level);
+  const { player, cats } = level.actors;
+  const inside = (point) => point.x >= 0 && point.x < level.board.columns && point.y >= 0 && point.y < level.board.rows;
+  if (!inside(player) || grid[player.y]?.[player.x]) errors.push('Der Startpunkt von Franz und Lola liegt außerhalb oder in einer Wand.');
+  cats.forEach((cat, index) => {
+    if (!inside(cat) || grid[cat.y]?.[cat.x]) errors.push(`Katze ${index + 1} liegt außerhalb oder in einer Wand.`);
+  });
+  const reachable = reachableTileKeys(level);
+  if (reachable.size === 0) errors.push('Vom Startpunkt ist keine begehbare Fläche erreichbar.');
+  level.collectibles.powerUps.forEach((point, index) => {
+    if (!reachable.has(tileKey(point.x, point.y))) errors.push(`Power-up ${index + 1} ist nicht erreichbar.`);
+  });
+  return { ok: errors.length === 0, errors, value: level };
+}
+
+export function parseLevelDocument(source) {
+  try {
+    const parsed = typeof source === 'string' ? JSON.parse(source) : clone(source);
+    return validateLevelDocument(parsed);
+  } catch (error) {
+    return { ok: false, errors: [`Ungültiges JSON: ${error.message}`], value: null };
+  }
+}
