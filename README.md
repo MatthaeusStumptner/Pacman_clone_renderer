@@ -43,6 +43,14 @@ Das maschinenlesbare Schema liegt unter `schema/franz-lola-level.schema.json` un
 
 Umgebungsdetails sind Teil desselben Renderers. Dazu gehören auch die animierte Zauberberg-Bühne mit zwei transparenten Lichtkegeln, Verstärkern, Lautsprechern und Musiknote sowie die Ereignissymbole und optional eingeblendeten Triggerzonen des Editors.
 
+`drawActorPreview()` rendert Franz & Lola oder eine Katze in beliebige Vorschaurahmen. Die Funktion verwendet exakt dieselben Custom-Sprites, Player States, Animationszeiten und Fallback-Painter wie `PassauPixelRenderer`; Editoren müssen daher keine zweite Figuren-Darstellung nachbauen.
+
+```js
+drawActorPreview(context, actor, { left: 0, top: 0, width: 96, height: 96 }, {
+  kind: 'player', state: 'right', animationId: 'right', elapsed: 0.35,
+});
+```
+
 ```js
 const simulation = new LevelSimulation(level, { difficulty: 'normal', pellets });
 const loop = new FixedStepLoop({ updatesPerSecond: 120 });
