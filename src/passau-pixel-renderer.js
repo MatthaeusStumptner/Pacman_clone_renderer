@@ -36,8 +36,9 @@ export class PassauPixelRenderer {
     const alpha = Math.min(1, Math.max(0, Number(options.alpha) || 0));
     const player = interpolate({ ...level.actors.player, ...(snapshot.player ?? {}) }, alpha);
     const cats = (snapshot.cats ?? level.actors.cats).map((cat, index) => interpolate({ ...(level.actors.cats[index] ?? {}), ...cat }, alpha)); const elapsed = Number(snapshot.elapsed) || 0;
+    const renderLevel = snapshot.decorations ? { ...level, decorations: snapshot.decorations } : level;
     const worldWidth = level.board.columns * level.board.tileSize; const worldHeight = level.board.rows * level.board.tileSize; const scene = this.sceneContext;
-    scene.clearRect(0, 0, worldWidth, worldHeight); drawEnvironment(scene, level, this.grid, elapsed); drawEasterEggs(scene, level, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
+    scene.clearRect(0, 0, worldWidth, worldHeight); drawEnvironment(scene, renderLevel, this.grid, elapsed); drawEasterEggs(scene, renderLevel, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
     drawCollectibles(scene, { pellets: snapshot.pellets, powerUps: snapshot.powerUps }, level.board.tileSize, elapsed);
     cats.forEach((cat) => drawCat(scene, { ...cat, elapsed }, level.board.tileSize, { frightened: (snapshot.powerTimer ?? 0) > 0, frightenedTime: snapshot.powerTimer ?? 0 }));
     drawWalker(scene, player, level.board.tileSize, { elapsed, hitTimer: snapshot.hitTimer });
@@ -49,7 +50,8 @@ export class PassauPixelRenderer {
     }
     this.drawVignette(worldWidth, worldHeight);
     const display = this.resize(); const viewport = options.viewport ?? { x: 0, y: 0, width: display.width, height: display.height };
-    const camera = calculateCamera({ worldWidth, worldHeight, viewport, target: { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 }, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
+    const cameraTarget = options.cameraTarget ?? { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 };
+    const camera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
     this.present(camera); const tile = level.board.tileSize; const playerScreen = projectWorldPoint(camera, { x: player.x * tile + tile / 2, y: player.y * tile + tile / 2 }); const bounds = visibleWorldBounds(camera);
     const entities = cats.map((cat, index) => { const world = { x: cat.x * tile + tile / 2, y: cat.y * tile + tile / 2 }; return { id: cat.id ?? `cat-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - cat.x, player.y - cat.y), color: cat.color, respawnTimer: cat.respawnTimer ?? 0 }; });
     return { camera, playerScreen, entities, display };

@@ -237,7 +237,9 @@ function drawDecorations(context, level, elapsed) {
     if (animation.type === 'blink') context.globalAlpha = Math.sin(phase) > 0 ? 1 : Math.max(0.08, 1 - animation.amplitude);
     context.translate(-centerX, -centerY);
     context.fillStyle = item.color;
-    if (item.type === 'tree') {
+    if (item.appearance && drawPixelSprite(context, item.appearance, { left, top, width, height }, { animationId: item.spriteAnimation ?? '', state: 'idle', elapsed })) {
+      // Freely authored sprite objects use the same animation format as actors.
+    } else if (item.type === 'tree') {
       context.fillStyle = '#5c3b2a'; context.fillRect(left + width * 0.43, top + height * 0.48, Math.max(2, width * 0.14), height * 0.42);
       context.fillStyle = item.color; context.fillRect(left + width * 0.2, top + height * 0.08, width * 0.6, height * 0.55);
     } else if (item.type === 'bench') {
@@ -286,3 +288,4 @@ export function drawEditorGrid(context, level) {
   }
   context.restore();
 }
+import { drawPixelSprite } from './sprites.js';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LEVEL_DOCUMENT_KIND, LEVEL_FORMAT_VERSION, compileWallGrid, createLevelDocument, reachableTileKeys, validateLevelDocument } from '../src/index.js';
+import { LEVEL_DOCUMENT_KIND, LEVEL_FORMAT_VERSION, compileWallGrid, createLevelDocument, reachableTileKeys, sampleCutscene, validateLevelDocument } from '../src/index.js';
 
 const valid = () => createLevelDocument({ kind: LEVEL_DOCUMENT_KIND, schemaVersion: LEVEL_FORMAT_VERSION, id: 'test-level', board: { columns: 9, rows: 9, tileSize: 24, tunnelRows: [4], walls: [] }, actors: { player: { x: 4, y: 6 }, cats: [{ x: 4, y: 4, color: '#ff6b5f', accent: '#9e302e' }] }, collectibles: { powerUps: [{ x: 1, y: 1 }] } });
 
@@ -85,4 +85,30 @@ test('validates unique event ids and usable direction sequences', () => {
   const event = { id: 'glocke', name: { standard: 'Glocke', dialect: 'Glockn' }, message: { standard: 'Bim', dialect: 'Bam' }, trigger: { type: 'direction-sequence', sequence: [] }, visual: { type: 'bell' } };
   level.events = [event, event]; const result = validateLevelDocument(level);
   assert.equal(result.ok, false); assert.match(result.errors.join(' '), /eindeutig/); assert.match(result.errors.join(' '), /mindestens eine Richtung/);
+});
+
+test('preserves reusable sprite objects and samples level-bound cutscenes', () => {
+  const level = valid();
+  level.decorations = [{
+    id: 'music-note-1', assetId: 'music-note', name: 'Musiknote', type: 'custom', x: 2, y: 2, width: 2, height: 2, color: '#55d9dd', label: '♪',
+    appearance: { width: 4, height: 4, palette: ['transparent', '#55d9dd'], pixels: ['0010', '0010', '0110', '1100'], animations: [{ id: 'pulse', fps: 4, frames: [{ pixels: ['0010', '0010', '0110', '1100'] }] }] },
+  }];
+  level.cutscenes = [{
+    id: 'intro', kind: 'intro', duration: 4, name: { standard: 'Ankunft', dialect: 'Oikemma' }, tracks: [
+      { id: 'franz', type: 'actor', target: 'player', keyframes: [{ time: 0, x: 1, y: 6, state: 'right' }, { time: 4, x: 5, y: 6, state: 'right', easing: 'ease-in-out' }] },
+      { id: 'note', type: 'object', target: 'music-note-1', keyframes: [{ time: 0, x: 2, y: 2 }, { time: 4, x: 6, y: 2, animation: 'pulse' }] },
+      { id: 'text', type: 'dialogue', target: 'dialogue', keyframes: [{ time: 1, duration: 2, speaker: 'Franz', text: { standard: 'Servus!', dialect: 'Hawedere!' } }] },
+    ],
+  }];
+  const normalized = createLevelDocument(level);
+  assert.equal(normalized.decorations[0].assetId, 'music-note');
+  assert.equal(normalized.decorations[0].appearance.palette.length, 2);
+  assert.equal(normalized.cutscenes[0].tracks.length, 3);
+  const sample = sampleCutscene(normalized, 'intro', 2, 'dialect');
+  assert.equal(sample.level.actors.player.x, 3);
+  assert.equal(sample.level.decorations[0].x, 4);
+  assert.equal(sample.player.x, 3);
+  assert.equal(sample.decorations[0].x, 4);
+  assert.equal(sample.dialogue.text, 'Hawedere!');
+  assert.equal(sample.done, false);
 });

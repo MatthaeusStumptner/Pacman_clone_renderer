@@ -89,6 +89,7 @@
     },
     "decorations": { "type": "array", "items": { "$ref": "#/$defs/decoration" } },
     "events": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/levelEvent" } },
+    "cutscenes": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/cutscene" } },
     "source": { "type": "object" }
   },
   "$defs": {
@@ -234,8 +235,48 @@
     "decoration": {
       "allOf": [
         { "$ref": "#/$defs/rectangle" },
-        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" } } }
+        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "assetId": { "type": "string" }, "name": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "layer": { "enum": ["ground", "scenery", "foreground"] }, "locked": { "type": "boolean" }, "appearance": { "$ref": "#/$defs/appearance" }, "spriteAnimation": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" } } }
       ]
+    },
+    "cutsceneKeyframe": {
+      "type": "object",
+      "required": ["id", "time", "easing"],
+      "properties": {
+        "id": { "type": "string" },
+        "time": { "type": "number", "minimum": 0, "maximum": 3600 },
+        "easing": { "enum": ["linear", "step", "ease-in-out"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "zoom": { "type": "number", "minimum": 0.25, "maximum": 4 },
+        "state": { "enum": ["idle", "up", "right", "down", "left"] },
+        "animation": { "type": "string" },
+        "visible": { "type": "boolean" },
+        "duration": { "type": "number", "minimum": 0.1, "maximum": 120 },
+        "speaker": { "type": "string" },
+        "text": { "$ref": "#/$defs/localized" }
+      }
+    },
+    "cutsceneTrack": {
+      "type": "object",
+      "required": ["id", "type", "target", "keyframes"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "enum": ["camera", "actor", "object", "dialogue"] },
+        "target": { "type": "string" },
+        "keyframes": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "$ref": "#/$defs/cutsceneKeyframe" } }
+      }
+    },
+    "cutscene": {
+      "type": "object",
+      "required": ["id", "kind", "name", "duration", "tracks"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "kind": { "enum": ["intro", "outro", "transition"] },
+        "name": { "$ref": "#/$defs/localized" },
+        "duration": { "type": "number", "minimum": 0.5, "maximum": 3600 },
+        "skippable": { "type": "boolean" },
+        "tracks": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/cutsceneTrack" } }
+      }
     }
   }
 }

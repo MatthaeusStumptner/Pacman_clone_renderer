@@ -120,6 +120,8 @@ function normalizeDecoration(value, index, columns, rows) {
   const type = allowedTypes.includes(value?.type) ? value.type : 'custom';
   return {
     id: text(value?.id, `decoration-${index + 1}`),
+    assetId: slug(value?.assetId, type),
+    name: text(value?.name, text(value?.label, `Objekt ${index + 1}`)),
     type,
     x: clamp(integer(value?.x, 1), 0, columns - 1),
     y: clamp(integer(value?.y, 1), 0, rows - 1),
@@ -127,7 +129,67 @@ function normalizeDecoration(value, index, columns, rows) {
     height: clamp(integer(value?.height, 1), 1, rows),
     color: color(value?.color, '#55d9dd'),
     label: text(value?.label, type === 'custom' ? '◆' : ''),
+    layer: ['ground', 'scenery', 'foreground'].includes(value?.layer) ? value.layer : 'scenery',
+    locked: Boolean(value?.locked),
+    appearance: normalizeAppearance(value?.appearance),
+    spriteAnimation: text(value?.spriteAnimation, ''),
     animation: normalizeMotionAnimation(value?.animation),
+  };
+}
+
+function normalizeCutsceneKeyframe(value, index, type, columns, rows) {
+  const base = {
+    id: slug(value?.id, `keyframe-${index + 1}`),
+    time: clamp(finite(value?.time, index), 0, 3600),
+    easing: ['linear', 'step', 'ease-in-out'].includes(value?.easing) ? value.easing : 'linear',
+  };
+  if (type === 'camera') return {
+    ...base,
+    x: clamp(finite(value?.x, columns / 2), 0, columns),
+    y: clamp(finite(value?.y, rows / 2), 0, rows),
+    zoom: clamp(finite(value?.zoom, 1.12), 0.25, 4),
+  };
+  if (type === 'dialogue') return {
+    ...base,
+    duration: clamp(finite(value?.duration, 2.5), 0.1, 120),
+    speaker: text(value?.speaker, ''),
+    text: normalizeLocalized(value?.text, ''),
+  };
+  return {
+    ...base,
+    x: clamp(finite(value?.x, columns / 2), -columns, columns * 2),
+    y: clamp(finite(value?.y, rows / 2), -rows, rows * 2),
+    state: ['idle', 'up', 'right', 'down', 'left'].includes(value?.state) ? value.state : 'idle',
+    animation: text(value?.animation, ''),
+    visible: value?.visible !== false,
+  };
+}
+
+function normalizeCutsceneTrack(value, index, columns, rows) {
+  const type = ['camera', 'actor', 'object', 'dialogue'].includes(value?.type) ? value.type : 'actor';
+  const source = Array.isArray(value?.keyframes) && value.keyframes.length ? value.keyframes : [{ time: 0 }];
+  return {
+    id: slug(value?.id, `track-${index + 1}`),
+    type,
+    target: text(value?.target, type === 'camera' ? 'camera' : type === 'dialogue' ? 'dialogue' : 'player'),
+    keyframes: source.slice(0, 128)
+      .map((keyframe, keyframeIndex) => normalizeCutsceneKeyframe(keyframe, keyframeIndex, type, columns, rows))
+      .sort((left, right) => left.time - right.time),
+  };
+}
+
+function normalizeCutscene(value, index, columns, rows) {
+  const tracks = (Array.isArray(value?.tracks) ? value.tracks : []).slice(0, 64)
+    .map((track, trackIndex) => normalizeCutsceneTrack(track, trackIndex, columns, rows));
+  const latest = tracks.flatMap((track) => track.keyframes.map((frame) => frame.time + (track.type === 'dialogue' ? frame.duration : 0)));
+  const minimumDuration = Math.max(0.5, ...latest);
+  return {
+    id: slug(value?.id, index === 0 ? 'intro' : `cutscene-${index + 1}`),
+    kind: ['intro', 'outro', 'transition'].includes(value?.kind) ? value.kind : (index === 0 ? 'intro' : 'transition'),
+    name: normalizeLocalized(value?.name, index === 0 ? 'Level-Intro' : `Cutscene ${index + 1}`),
+    duration: clamp(finite(value?.duration, minimumDuration), minimumDuration, 3600),
+    skippable: value?.skippable !== false,
+    tracks,
   };
 }
 
@@ -283,6 +345,8 @@ export function createLevelDocument(input = {}) {
       .map((entry, index) => normalizeDecoration(entry, index, columns, rows)),
     events: (Array.isArray(input.events) ? input.events : [])
       .slice(0, 64).map((entry, index) => normalizeLevelEvent(entry, index, columns, rows)),
+    cutscenes: (Array.isArray(input.cutscenes) ? input.cutscenes : [])
+      .slice(0, 16).map((entry, index) => normalizeCutscene(entry, index, columns, rows)),
   };
 }
 
@@ -388,6 +452,17 @@ export function validateLevelDocument(input) {
       });
       if (!reachableZone) warnings.push(`Triggerzone von Ereignis ${index + 1} ist vom Startpunkt nicht erreichbar.`);
     }
+  });
+  const cutsceneIds = level.cutscenes.map((cutscene) => cutscene.id);
+  if (new Set(cutsceneIds).size !== cutsceneIds.length) errors.push('Cutscene-IDs müssen innerhalb eines Levels eindeutig sein.');
+  const decorationIds = new Set(level.decorations.map((item) => item.id));
+  level.cutscenes.forEach((cutscene, cutsceneIndex) => {
+    const trackIds = cutscene.tracks.map((track) => track.id);
+    if (new Set(trackIds).size !== trackIds.length) errors.push(`Track-IDs in Cutscene ${cutsceneIndex + 1} müssen eindeutig sein.`);
+    cutscene.tracks.forEach((track) => {
+      if (track.type === 'object' && !decorationIds.has(track.target)) warnings.push(`Cutscene „${cutscene.id}“ verweist auf das unbekannte Objekt „${track.target}“.`);
+      if (track.keyframes.some((frame) => frame.time > cutscene.duration)) errors.push(`Ein Keyframe in Cutscene „${cutscene.id}“ liegt hinter der Dauer.`);
+    });
   });
   return {
     ok: errors.length === 0,
