@@ -263,7 +263,7 @@
     },
     "decoration": {
       "allOf": [
-        { "$ref": "#/$defs/rectangle" },
+        { "type": "object", "required": ["x", "y", "width", "height"], "properties": { "x": { "type": "number", "minimum": 0 }, "y": { "type": "number", "minimum": 0 }, "width": { "type": "number", "minimum": 0.25 }, "height": { "type": "number", "minimum": 0.25 } } },
         { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "assetId": { "type": "string" }, "name": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom", "text"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "layer": { "enum": ["ground", "scenery", "foreground"] }, "locked": { "type": "boolean" }, "appearance": { "$ref": "#/$defs/appearance" }, "spriteAnimation": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" }, "content": { "$ref": "#/$defs/localized" }, "textStyle": { "$ref": "#/$defs/textStyle" } } }
       ]
     },

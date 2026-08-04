@@ -24,7 +24,7 @@ Ein Level ist reines JSON mit `kind: "franz-lola-level"` und `schemaVersion: 1`.
 - explizite Spielerzustände `idle`, `up`, `right`, `down` und `left`, die frei auf Sprite-Animationen abgebildet werden
 - frei konfigurierbares Spieler- und Katzenverhalten (Steuerung, Jagdstrategie, Ziel, Tempo, Voraussicht und Zufall)
 - Dekorationen wie Bäume, Bänke, Lampen, Schilder, Wasser oder freie Symbole mit Schwebe-, Puls-, Blink-, Dreh- und frei definierbarer Transform-Keyframe-Bewegung
-- frei bewegliche zweisprachige Textblöcke mit Größe, Ausrichtung, Hintergrund, Rahmen und eigener Animation
+- stufenlos positionier- und skalierbare zweisprachige Textblöcke mit Größe, Ausrichtung, Hintergrund, Rahmen und eigener Animation
 - frei definierbare Ereignisse mit Triggerzonen, Richtungsfolgen oder Zeitpunkten, lokalisierten Standard-/Dialekttexten, Belohnungen und Sichtbarkeitsregeln
 - eingebaute Pixel-Ereignissymbole für Eisvogel, Pfote und Kirchenglocke sowie beliebige Sprite-Objekte aus der gemeinsamen Bibliothek
 - levelgebundene Intro-, Übergangs- und Outro-Cutscenes mit Kamera-, Figuren-, Objekt- und Dialogspuren
@@ -42,6 +42,8 @@ Das maschinenlesbare Schema liegt unter `schema/franz-lola-level.schema.json` un
 `DirectionalSwipeInput` und `queuePlayerDirection()` bilden außerdem den gemeinsamen Eingabevertrag für Spiel und Editor-Testlauf: Wischen reagiert während der Geste, Gegenrichtungen kehren sofort um und Abzweigungen werden bis zum nächsten gültigen Rasterzentrum gepuffert, ohne die Figur zu versetzen.
 
 Umgebungsdetails sind Teil desselben Renderers. Dazu gehören auch die animierte Zauberberg-Bühne mit zwei transparenten Lichtkegeln, Verstärkern, Lautsprechern und Musiknote sowie die Ereignissymbole und optional eingeblendeten Triggerzonen des Editors.
+
+Textblöcke werden mit Pretext Unicode-sicher vorbereitet und vermessen. Ihre Glyphen entstehen nach der Pixelwelt direkt in der endgültigen Kameraauflösung; dadurch bleiben sie auch bei Retina-Displays, Kamerazoom und gebrochenen Objektkoordinaten scharf, ohne die Pixelgrafik weichzuzeichnen.
 
 `drawActorPreview()` rendert Franz & Lola oder eine Katze in beliebige Vorschaurahmen. Die Funktion verwendet exakt dieselben Custom-Sprites, Player States, Animationszeiten und Fallback-Painter wie `PassauPixelRenderer`; Editoren müssen daher keine zweite Figuren-Darstellung nachbauen.
 

@@ -1,3 +1,7 @@
+import { drawPixelSprite } from './sprites.js';
+import { applyMotionAnimation } from '../motion-animation.js';
+import { layoutCanvasText } from '../text-layout.js';
+
 function isWall(grid, x, y) {
   return Boolean(grid[y]?.[x]);
 }
@@ -206,24 +210,15 @@ export function drawEnvironment(context, level, grid, elapsed = 0, options = {})
   else if (level.theme.landmark === 'zauberberg') drawStage(context, level, elapsed);
   else drawDogPark(context, level, grid);
   if (level.theme.landmark === 'brahmahof-home') drawHome(context, level);
-  drawDecorations(context, level, elapsed, options.language);
+  drawDecorations(context, level, elapsed, options.language, { excludeText: options.excludeText });
 }
 
-export function drawDecorations(context, level, elapsed, language = 'standard') {
+export function drawDecorations(context, level, elapsed, language = 'standard', { excludeText = false, onlyText = false } = {}) {
   const tile = level.board.tileSize;
-  level.decorations.forEach((item) => drawDecoration(context, item, tile, elapsed, language));
-}
-
-function wrapText(context, value, maximumWidth) {
-  const words = String(value || '').split(/\s+/).filter(Boolean);
-  const lines = [];
-  words.forEach((word) => {
-    const next = lines.length ? `${lines.at(-1)} ${word}` : word;
-    if (lines.length && context.measureText(next).width > maximumWidth) lines.push(word);
-    else if (lines.length) lines[lines.length - 1] = next;
-    else lines.push(word);
+  level.decorations.forEach((item) => {
+    if ((excludeText && item.type === 'text') || (onlyText && item.type !== 'text')) return;
+    drawDecoration(context, item, tile, elapsed, language);
   });
-  return lines.length ? lines : [''];
 }
 
 export function drawDecoration(context, item, tile, elapsed = 0, language = 'standard') {
@@ -245,11 +240,13 @@ export function drawDecoration(context, item, tile, elapsed = 0, language = 'sta
       context.fillStyle = style.background || '#071016'; context.globalAlpha *= 0.88;
       context.fillRect(left, top, width, height); context.globalAlpha /= 0.88;
       context.strokeStyle = style.borderColor || item.color; context.lineWidth = Math.max(1, tile * 0.06); context.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
-      context.fillStyle = item.color; context.font = `${fontSize}px monospace`; context.textAlign = style.align || 'center'; context.textBaseline = 'top';
-      const lines = wrapText(context, style.uppercase ? value.toUpperCase() : value, textWidth);
-      const lineHeight = fontSize * 1.18; const blockHeight = lines.length * lineHeight;
+      context.fillStyle = item.color; context.font = `600 ${fontSize}px "Courier New", monospace`; context.textAlign = style.align || 'center'; context.textBaseline = 'top';
+      const lineHeight = fontSize * 1.18;
+      const lines = layoutCanvasText(context, style.uppercase ? value.toUpperCase() : value, textWidth, lineHeight);
+      const blockHeight = lines.length * lineHeight;
       const startY = style.verticalAlign === 'top' ? top + padding : style.verticalAlign === 'bottom' ? top + height - padding - blockHeight : top + (height - blockHeight) / 2;
       const textX = style.align === 'left' ? left + padding : style.align === 'right' ? left + width - padding : left + width / 2;
+      context.beginPath(); context.rect(left + padding, top + padding, textWidth, Math.max(1, height - padding * 2)); context.clip();
       lines.forEach((line, index) => context.fillText(line, textX, startY + index * lineHeight, textWidth));
     } else if (item.appearance && drawPixelSprite(context, item.appearance, { left, top, width, height }, { animationId: item.spriteAnimation ?? '', state: 'idle', elapsed })) {
       // Freely authored sprite objects use the same animation format as actors.
@@ -313,5 +310,3 @@ export function drawEditorGrid(context, level) {
   }
   context.restore();
 }
-import { drawPixelSprite } from './sprites.js';
-import { applyMotionAnimation } from '../motion-animation.js';
