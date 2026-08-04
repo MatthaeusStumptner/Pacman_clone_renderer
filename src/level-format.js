@@ -170,6 +170,7 @@ function normalizeDecoration(value, index, columns, rows) {
       align: ['left', 'center', 'right'].includes(value?.textStyle?.align) ? value.textStyle.align : 'center',
       verticalAlign: ['top', 'middle', 'bottom'].includes(value?.textStyle?.verticalAlign) ? value.textStyle.verticalAlign : 'middle',
       background: color(value?.textStyle?.background, '#071016'),
+      backgroundOpacity: clamp(finite(value?.textStyle?.backgroundOpacity, 0.88), 0, 1),
       borderColor: color(value?.textStyle?.borderColor, '#55d9dd'),
       padding: clamp(finite(value?.textStyle?.padding, 0.2), 0, 2),
       uppercase: Boolean(value?.textStyle?.uppercase),

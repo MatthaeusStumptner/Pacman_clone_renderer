@@ -274,6 +274,7 @@
         "align": { "enum": ["left", "center", "right"] },
         "verticalAlign": { "enum": ["top", "middle", "bottom"] },
         "background": { "$ref": "#/$defs/color" },
+        "backgroundOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
         "borderColor": { "$ref": "#/$defs/color" },
         "padding": { "type": "number", "minimum": 0, "maximum": 2 },
         "uppercase": { "type": "boolean" }
