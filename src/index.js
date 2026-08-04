@@ -16,6 +16,8 @@ export {
 } from './camera.js';
 
 export { PassauPixelRenderer } from './passau-pixel-renderer.js';
+export { cutsceneById, sampleCutscene } from './cutscene.js';
+export { drawPixelSprite } from './painters/sprites.js';
 
 export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, selectAppearanceFrame, stateAnimationId } from './animation.js';
 export { DirectionalSwipeInput } from './input.js';

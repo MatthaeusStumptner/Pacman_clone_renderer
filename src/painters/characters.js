@@ -1,27 +1,11 @@
+import { animationById } from '../animation.js';
+import { drawActorAppearance } from './sprites.js';
+
 const DIRECTIONS = Object.freeze({
   left: { name: 'left', x: -1, y: 0 }, right: { name: 'right', x: 1, y: 0 },
   up: { name: 'up', x: 0, y: -1 }, down: { name: 'down', x: 0, y: 1 }, none: { name: 'none', x: 0, y: 0 },
 });
 const directionOf = (direction) => typeof direction === 'string' ? DIRECTIONS[direction] ?? DIRECTIONS.none : direction?.name ? direction : DIRECTIONS.none;
-
-function drawPixelAppearance(context, actor, tileSize, { animationId = '', state = 'idle', elapsed = 0 } = {}) {
-  const appearance = actor.appearance;
-  if (!appearance) return false;
-  const scale = Math.max(1, Math.floor((tileSize * 0.9) / Math.max(appearance.width, appearance.height)));
-  const width = appearance.width * scale;
-  const height = appearance.height * scale;
-  const left = Math.round(actor.x * tileSize + (tileSize - width) / 2);
-  const top = Math.round(actor.y * tileSize + (tileSize - height) / 2);
-  const pixels = selectAppearanceFrame(appearance, { animationId, state, elapsed });
-  pixels.forEach((row, y) => [...row].forEach((token, x) => {
-    const paletteIndex = Number.parseInt(token, 36);
-    const pixelColor = appearance.palette[paletteIndex];
-    if (!pixelColor || pixelColor === 'transparent') return;
-    context.fillStyle = pixelColor;
-    context.fillRect(left + x * scale, top + y * scale, scale, scale);
-  }));
-  return true;
-}
 
 function drawDog(context, px, py, direction, elapsed) {
   const wiggle = Math.sin(elapsed * 18) > 0 ? 1 : -1;
@@ -41,7 +25,7 @@ export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 
   const direction = current.name === 'none' ? queued : current;
   if (hitTimer > 0 && Math.floor(hitTimer * 10) % 2 === 0) return;
   const state = direction.name === 'none' ? 'idle' : direction.name;
-  if (drawPixelAppearance(context, player, tileSize, { animationId: player.animation ?? '', state, elapsed })) return;
+  if (drawActorAppearance(context, player, tileSize, { animationId: player.animation ?? '', state, elapsed })) return;
   const px = Math.round(player.x * tileSize + tileSize / 2);
   const py = Math.round(player.y * tileSize + tileSize / 2);
   const dir = direction.name === 'none' ? DIRECTIONS.left : direction;
@@ -63,9 +47,9 @@ export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 
 export function drawCat(context, cat, tileSize, { frightened = false, frightenedTime = 0 } = {}) {
   if (cat.respawnTimer > 0 && Math.floor(cat.respawnTimer * 8) % 2 === 0) return;
   const elapsed = Number(cat.elapsed) || 0;
-  if (frightened && animationById(cat.appearance, 'frightened') && drawPixelAppearance(context, cat, tileSize, { animationId: 'frightened', state: 'idle', elapsed })) return;
+  if (frightened && animationById(cat.appearance, 'frightened') && drawActorAppearance(context, cat, tileSize, { animationId: 'frightened', state: 'idle', elapsed })) return;
   const catDirection = directionOf(cat.dir);
-  if (!frightened && drawPixelAppearance(context, cat, tileSize, { animationId: cat.animation ?? '', state: catDirection.name === 'none' ? 'idle' : catDirection.name, elapsed })) return;
+  if (!frightened && drawActorAppearance(context, cat, tileSize, { animationId: cat.animation ?? '', state: catDirection.name === 'none' ? 'idle' : catDirection.name, elapsed })) return;
   const px = Math.round(cat.x * tileSize + tileSize / 2); const py = Math.round(cat.y * tileSize + tileSize / 2);
   const flashing = frightened && frightenedTime < 2 && Math.floor(frightenedTime * 8) % 2;
   const body = frightened ? (flashing ? '#f3eee0' : '#2379a3') : cat.color; const accent = frightened ? '#174e77' : cat.accent;
@@ -76,4 +60,3 @@ export function drawCat(context, cat, tileSize, { frightened = false, frightened
   context.fillStyle = frightened ? '#f5f0d9' : '#17212a'; context.fillRect(px - 3, py - 2, 2, 2); context.fillRect(px + 3, py - 2, 2, 2);
   context.fillStyle = body; context.fillRect(px + 7, py + 1, 3, 7); context.fillRect(px + 8, py - 1, 5, 3);
 }
-import { animationById, selectAppearanceFrame } from '../animation.js';

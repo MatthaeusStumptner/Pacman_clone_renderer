@@ -15,4 +15,8 @@ test('ships a machine-readable schema for the public level contract', async () =
   assert.ok(schema.$defs.motionAnimation);
   assert.ok(schema.$defs.levelEvent);
   assert.ok(schema.properties.events);
+  assert.ok(schema.$defs.cutscene);
+  assert.ok(schema.$defs.cutsceneTrack);
+  assert.ok(schema.properties.cutscenes);
+  assert.ok(schema.$defs.decoration.properties === undefined || schema.$defs.decoration.allOf[1].properties.appearance);
 });
