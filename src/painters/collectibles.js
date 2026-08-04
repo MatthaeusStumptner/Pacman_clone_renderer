@@ -39,6 +39,20 @@ function drawCustomEvent(context, event, tile, active) {
   context.font = `${Math.max(8, Math.round(tile * 0.7))}px monospace`; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(event.visual.label, px, py);
 }
 
+function drawSpriteEvent(context, event, tile, elapsed, active) {
+  const px = event.visual.x * tile; const py = event.visual.y * tile;
+  context.save();
+  applyMotionAnimation(context, event.visual.animation, elapsed, px, py, tile);
+  if (active) { context.shadowColor = event.visual.accent; context.shadowBlur = tile * 0.45; }
+  drawPixelSprite(context, event.visual.appearance, {
+    left: px - tile * 0.75,
+    top: py - tile * 0.75,
+    width: tile * 1.5,
+    height: tile * 1.5,
+  }, { animationId: event.visual.spriteAnimation, elapsed });
+  context.restore();
+}
+
 export function drawEasterEggs(context, level, eggs = {}, elapsed = 0) {
   const tile = level.board.tileSize;
   if (!level.events?.length) {
@@ -52,7 +66,8 @@ export function drawEasterEggs(context, level, eggs = {}, elapsed = 0) {
     const visible = eggs.showAll || event.visual.visibility === 'always' || unlocked.has(event.id) || activeId === event.id;
     if (!visible || event.visual.type === 'none') return;
     const active = activeId === event.id;
-    if (event.visual.type === 'kingfisher') drawKingfisher(context, event, tile, elapsed, active);
+    if (event.visual.appearance) drawSpriteEvent(context, event, tile, elapsed, active);
+    else if (event.visual.type === 'kingfisher') drawKingfisher(context, event, tile, elapsed, active);
     else if (event.visual.type === 'paw') drawPaw(context, event, tile, active);
     else if (event.visual.type === 'bell') drawBell(context, event, tile, elapsed, active);
     else drawCustomEvent(context, event, tile, active);
@@ -63,3 +78,6 @@ export function drawEasterEggs(context, level, eggs = {}, elapsed = 0) {
     context.restore();
   }
 }
+
+import { drawPixelSprite } from './sprites.js';
+import { applyMotionAnimation } from '../motion-animation.js';

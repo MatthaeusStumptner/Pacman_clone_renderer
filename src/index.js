@@ -18,8 +18,10 @@ export {
 export { PassauPixelRenderer } from './passau-pixel-renderer.js';
 export { cutsceneById, sampleCutscene } from './cutscene.js';
 export { drawPixelSprite } from './painters/sprites.js';
+export { drawDecoration, drawDecorationPreview } from './painters/environment.js';
 
-export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, selectAppearanceFrame, stateAnimationId } from './animation.js';
+export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, animationDuration, animationKeyframes, selectAppearanceFrame, stateAnimationId } from './animation.js';
+export { applyMotionAnimation, sampleMotionAnimation } from './motion-animation.js';
 export { DirectionalSwipeInput } from './input.js';
 export { FixedStepLoop } from './simulation/fixed-step-loop.js';
 export { moveGridActor } from './simulation/grid-motion.js';

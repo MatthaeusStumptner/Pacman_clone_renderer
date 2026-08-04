@@ -77,14 +77,28 @@ function normalizeAppearance(value) {
     .slice(0, 36)
     .map((entry, index) => index === 0 && entry === 'transparent' ? entry : color(entry, index === 0 ? '#000000' : '#f4eee0'));
   const pixels = normalizePixels(value.pixels, width, height, palette.length);
-  const animations = (Array.isArray(value.animations) ? value.animations : []).slice(0, 24).map((animation, index) => ({
-    id: text(animation?.id, `animation-${index + 1}`).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-') || `animation-${index + 1}`,
-    fps: clamp(finite(animation?.fps, 6), 0.25, 30),
-    loop: animation?.loop !== false,
-    frames: (Array.isArray(animation?.frames) && animation.frames.length ? animation.frames : [{ pixels }])
-      .slice(0, 64)
-      .map((frame) => ({ pixels: normalizePixels(frame?.pixels ?? frame, width, height, palette.length) })),
-  }));
+  const animations = (Array.isArray(value.animations) ? value.animations : []).slice(0, 24).map((animation, index) => {
+    const fps = clamp(finite(animation?.fps, 6), 0.25, 30);
+    const source = Array.isArray(animation?.keyframes) && animation.keyframes.length
+      ? animation.keyframes
+      : Array.isArray(animation?.frames) && animation.frames.length ? animation.frames : [{ pixels }];
+    const keyframes = source.slice(0, 64).map((frame, frameIndex) => ({
+      id: slug(frame?.id, `keyframe-${frameIndex + 1}`),
+      time: clamp(finite(frame?.time, frameIndex / fps), 0, 3600),
+      easing: ['step', 'linear', 'ease-in-out'].includes(frame?.easing) ? frame.easing : 'step',
+      pixels: normalizePixels(frame?.pixels ?? frame, width, height, palette.length),
+    })).sort((left, right) => left.time - right.time);
+    const minimumDuration = Math.max(1 / fps, (keyframes.at(-1)?.time ?? 0) + 1 / fps);
+    return {
+      id: slug(animation?.id, `animation-${index + 1}`),
+      fps,
+      duration: clamp(finite(animation?.duration, minimumDuration), minimumDuration, 3600),
+      loop: animation?.loop !== false,
+      keyframes,
+      // Legacy readers can continue to consume frames; keyframes remain canonical.
+      frames: keyframes.map((frame) => ({ pixels: frame.pixels })),
+    };
+  });
   const animationIds = new Set(animations.map((animation) => animation.id));
   const stateAnimations = Object.fromEntries(['idle', 'up', 'right', 'down', 'left'].map((state) => {
     const requested = text(value.stateAnimations?.[state], '');
@@ -98,10 +112,26 @@ function normalizeAppearance(value) {
 }
 
 function normalizeMotionAnimation(value, fallback = {}) {
+  const type = ['none', 'bob', 'pulse', 'blink', 'spin', 'keyframes'].includes(value?.type) ? value.type : (fallback.type ?? 'none');
+  const source = Array.isArray(value?.keyframes) && value.keyframes.length ? value.keyframes : [];
+  const keyframes = source.slice(0, 64).map((frame, index) => ({
+    id: slug(frame?.id, `motion-${index + 1}`),
+    time: clamp(finite(frame?.time, index), 0, 3600),
+    x: clamp(finite(frame?.x, 0), -48, 48),
+    y: clamp(finite(frame?.y, 0), -48, 48),
+    scale: clamp(finite(frame?.scale, 1), 0.05, 8),
+    rotation: clamp(finite(frame?.rotation, 0), -3600, 3600),
+    opacity: clamp(finite(frame?.opacity, 1), 0, 1),
+    easing: ['step', 'linear', 'ease-in-out'].includes(frame?.easing) ? frame.easing : 'linear',
+  })).sort((left, right) => left.time - right.time);
+  const minimumDuration = Math.max(0.1, keyframes.at(-1)?.time ?? 0);
   return {
-    type: ['none', 'bob', 'pulse', 'blink', 'spin'].includes(value?.type) ? value.type : (fallback.type ?? 'none'),
+    type,
     speed: clamp(finite(value?.speed, fallback.speed ?? 1), 0.1, 12),
     amplitude: clamp(finite(value?.amplitude, fallback.amplitude ?? 0.15), 0, 1),
+    duration: clamp(finite(value?.duration, fallback.duration ?? Math.max(1, minimumDuration)), Math.max(0.1, minimumDuration), 3600),
+    loop: value?.loop !== false,
+    keyframes,
   };
 }
 
@@ -116,7 +146,7 @@ function normalizeThemeElements(value, landmark) {
 }
 
 function normalizeDecoration(value, index, columns, rows) {
-  const allowedTypes = ['tree', 'bench', 'lamp', 'flower', 'sign', 'rock', 'water', 'custom'];
+  const allowedTypes = ['tree', 'bench', 'lamp', 'flower', 'sign', 'rock', 'water', 'custom', 'text'];
   const type = allowedTypes.includes(value?.type) ? value.type : 'custom';
   return {
     id: text(value?.id, `decoration-${index + 1}`),
@@ -134,6 +164,16 @@ function normalizeDecoration(value, index, columns, rows) {
     appearance: normalizeAppearance(value?.appearance),
     spriteAnimation: text(value?.spriteAnimation, ''),
     animation: normalizeMotionAnimation(value?.animation),
+    content: normalizeLocalized(value?.content, text(value?.label, 'Textblock')),
+    textStyle: {
+      fontSize: clamp(finite(value?.textStyle?.fontSize, 0.5), 0.15, 4),
+      align: ['left', 'center', 'right'].includes(value?.textStyle?.align) ? value.textStyle.align : 'center',
+      verticalAlign: ['top', 'middle', 'bottom'].includes(value?.textStyle?.verticalAlign) ? value.textStyle.verticalAlign : 'middle',
+      background: color(value?.textStyle?.background, '#071016'),
+      borderColor: color(value?.textStyle?.borderColor, '#55d9dd'),
+      padding: clamp(finite(value?.textStyle?.padding, 0.2), 0, 2),
+      uppercase: Boolean(value?.textStyle?.uppercase),
+    },
   };
 }
 
@@ -250,6 +290,10 @@ function normalizeLevelEvent(value, index, columns, rows) {
       accent: color(value?.visual?.accent, '#f5c451'),
       label: text(value?.visual?.label, '◆'),
       visibility: ['after-trigger', 'always'].includes(value?.visual?.visibility) ? value.visual.visibility : 'after-trigger',
+      assetId: slug(value?.visual?.assetId, ''),
+      appearance: normalizeAppearance(value?.visual?.appearance),
+      spriteAnimation: text(value?.visual?.spriteAnimation, ''),
+      animation: normalizeMotionAnimation(value?.visual?.animation),
     },
   };
 }

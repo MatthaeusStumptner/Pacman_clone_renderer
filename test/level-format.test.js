@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { LEVEL_DOCUMENT_KIND, LEVEL_FORMAT_VERSION, compileWallGrid, createLevelDocument, reachableTileKeys, sampleCutscene, validateLevelDocument } from '../src/index.js';
 
 const valid = () => createLevelDocument({ kind: LEVEL_DOCUMENT_KIND, schemaVersion: LEVEL_FORMAT_VERSION, id: 'test-level', board: { columns: 9, rows: 9, tileSize: 24, tunnelRows: [4], walls: [] }, actors: { player: { x: 4, y: 6 }, cats: [{ x: 4, y: 4, color: '#ff6b5f', accent: '#9e302e' }] }, collectibles: { powerUps: [{ x: 1, y: 1 }] } });
+const rows = (token) => Array.from({ length: 4 }, () => token.repeat(4));
 
 test('normalizes and validates the shared level format', () => {
   const result = validateLevelDocument(valid()); assert.equal(result.ok, true, result.errors.join('\n')); assert.equal(result.value.kind, LEVEL_DOCUMENT_KIND); assert.equal(result.value.schemaVersion, LEVEL_FORMAT_VERSION);
@@ -111,4 +112,17 @@ test('preserves reusable sprite objects and samples level-bound cutscenes', () =
   assert.equal(sample.decorations[0].x, 4);
   assert.equal(sample.dialogue.text, 'Hawedere!');
   assert.equal(sample.done, false);
+});
+
+test('preserves freely positioned localized text blocks and sprite event visuals', () => {
+  const level = valid();
+  const appearance = { width: 4, height: 4, palette: ['transparent', '#ffffff'], pixels: rows('1'), animations: [{ id: 'idle', duration: 1, keyframes: [{ id: 'keyframe-1', time: 0, pixels: rows('1') }] }] };
+  level.decorations = [{ id: 'copy', type: 'text', x: 1, y: 2, width: 5, height: 2, color: '#ffffff', content: { standard: 'Freier Text', dialect: 'Freia Text' }, textStyle: { fontSize: 0.7, align: 'left', background: '#071016', borderColor: '#55d9dd' } }];
+  level.events = [{ id: 'sprite-event', name: { standard: 'Objekt', dialect: 'Objekt' }, message: { standard: 'Da!', dialect: 'Do!' }, trigger: { type: 'time', seconds: 1 }, visual: { type: 'custom', assetId: 'spark', appearance, spriteAnimation: 'idle', animation: { type: 'pulse', speed: 1, amplitude: 0.1 } } }];
+  const normalized = createLevelDocument(level);
+  assert.equal(normalized.decorations[0].type, 'text');
+  assert.equal(normalized.decorations[0].content.dialect, 'Freia Text');
+  assert.equal(normalized.decorations[0].textStyle.align, 'left');
+  assert.equal(normalized.events[0].visual.assetId, 'spark');
+  assert.equal(normalized.events[0].visual.appearance.animations[0].keyframes.length, 1);
 });
