@@ -36,8 +36,9 @@ export class PassauPixelRenderer {
     const alpha = Math.min(1, Math.max(0, Number(options.alpha) || 0));
     const player = interpolate({ ...level.actors.player, ...(snapshot.player ?? {}) }, alpha);
     const cats = (snapshot.cats ?? level.actors.cats).map((cat, index) => interpolate({ ...(level.actors.cats[index] ?? {}), ...cat }, alpha)); const elapsed = Number(snapshot.elapsed) || 0;
+    const renderLevel = snapshot.decorations ? { ...level, decorations: snapshot.decorations } : level;
     const worldWidth = level.board.columns * level.board.tileSize; const worldHeight = level.board.rows * level.board.tileSize; const scene = this.sceneContext;
-    scene.clearRect(0, 0, worldWidth, worldHeight); drawEnvironment(scene, level, this.grid, elapsed); drawEasterEggs(scene, level, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
+    scene.clearRect(0, 0, worldWidth, worldHeight); drawEnvironment(scene, renderLevel, this.grid, elapsed); drawEasterEggs(scene, renderLevel, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
     drawCollectibles(scene, { pellets: snapshot.pellets, powerUps: snapshot.powerUps }, level.board.tileSize, elapsed);
     cats.forEach((cat) => drawCat(scene, { ...cat, elapsed }, level.board.tileSize, { frightened: (snapshot.powerTimer ?? 0) > 0, frightenedTime: snapshot.powerTimer ?? 0 }));
     drawWalker(scene, player, level.board.tileSize, { elapsed, hitTimer: snapshot.hitTimer });

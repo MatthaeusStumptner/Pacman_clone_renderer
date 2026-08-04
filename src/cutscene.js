@@ -69,6 +69,9 @@ export function sampleCutscene(levelInput, cutsceneInput, elapsed = 0, language 
   level.actors.cats = level.actors.cats.filter((cat) => !cat.hidden);
   return {
     level,
+    player: level.actors.player,
+    cats: level.actors.cats,
+    decorations: level.decorations,
     time,
     duration: cutscene.duration,
     progress: cutscene.duration ? time / cutscene.duration : 1,

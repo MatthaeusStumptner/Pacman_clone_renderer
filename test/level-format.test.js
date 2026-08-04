@@ -107,6 +107,8 @@ test('preserves reusable sprite objects and samples level-bound cutscenes', () =
   const sample = sampleCutscene(normalized, 'intro', 2, 'dialect');
   assert.equal(sample.level.actors.player.x, 3);
   assert.equal(sample.level.decorations[0].x, 4);
+  assert.equal(sample.player.x, 3);
+  assert.equal(sample.decorations[0].x, 4);
   assert.equal(sample.dialogue.text, 'Hawedere!');
   assert.equal(sample.done, false);
 });
