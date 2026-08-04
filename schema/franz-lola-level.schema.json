@@ -134,16 +134,24 @@
     "animationFrame": {
       "type": "object",
       "required": ["pixels"],
-      "properties": { "pixels": { "type": "array", "items": { "type": "string" } } }
+      "properties": {
+        "id": { "type": "string" },
+        "time": { "type": "number", "minimum": 0, "maximum": 3600 },
+        "easing": { "enum": ["linear", "step", "ease-in-out"] },
+        "pixels": { "type": "array", "items": { "type": "string" } }
+      }
     },
     "spriteAnimation": {
       "type": "object",
-      "required": ["id", "frames"],
+      "required": ["id"],
+      "anyOf": [{ "required": ["frames"] }, { "required": ["keyframes"] }],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
         "fps": { "type": "number", "minimum": 0.25, "maximum": 30 },
+        "duration": { "type": "number", "minimum": 0.1, "maximum": 3600 },
         "loop": { "type": "boolean" },
-        "frames": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/animationFrame" } }
+        "frames": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/animationFrame" } },
+        "keyframes": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/animationFrame" } }
       }
     },
     "themeElement": {
@@ -190,9 +198,26 @@
     "motionAnimation": {
       "type": "object",
       "properties": {
-        "type": { "enum": ["none", "bob", "pulse", "blink", "spin"] },
+        "type": { "enum": ["none", "bob", "pulse", "blink", "spin", "keyframes"] },
         "speed": { "type": "number", "minimum": 0.1, "maximum": 12 },
-        "amplitude": { "type": "number", "minimum": 0, "maximum": 1 }
+        "amplitude": { "type": "number", "minimum": 0, "maximum": 1 },
+        "duration": { "type": "number", "minimum": 0.1, "maximum": 3600 },
+        "loop": { "type": "boolean" },
+        "keyframes": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/motionKeyframe" } }
+      }
+    },
+    "motionKeyframe": {
+      "type": "object",
+      "required": ["id", "time"],
+      "properties": {
+        "id": { "type": "string" },
+        "time": { "type": "number", "minimum": 0, "maximum": 3600 },
+        "x": { "type": "number", "minimum": -48, "maximum": 48 },
+        "y": { "type": "number", "minimum": -48, "maximum": 48 },
+        "scale": { "type": "number", "minimum": 0.05, "maximum": 8 },
+        "rotation": { "type": "number", "minimum": -3600, "maximum": 3600 },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "easing": { "enum": ["linear", "step", "ease-in-out"] }
       }
     },
     "eventTrigger": {
@@ -215,7 +240,11 @@
         "color": { "$ref": "#/$defs/color" },
         "accent": { "$ref": "#/$defs/color" },
         "label": { "type": "string" },
-        "visibility": { "enum": ["after-trigger", "always"] }
+        "visibility": { "enum": ["after-trigger", "always"] },
+        "assetId": { "type": "string" },
+        "appearance": { "$ref": "#/$defs/appearance" },
+        "spriteAnimation": { "type": "string" },
+        "animation": { "$ref": "#/$defs/motionAnimation" }
       }
     },
     "levelEvent": {
@@ -235,8 +264,20 @@
     "decoration": {
       "allOf": [
         { "$ref": "#/$defs/rectangle" },
-        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "assetId": { "type": "string" }, "name": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "layer": { "enum": ["ground", "scenery", "foreground"] }, "locked": { "type": "boolean" }, "appearance": { "$ref": "#/$defs/appearance" }, "spriteAnimation": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" } } }
+        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "assetId": { "type": "string" }, "name": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom", "text"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "layer": { "enum": ["ground", "scenery", "foreground"] }, "locked": { "type": "boolean" }, "appearance": { "$ref": "#/$defs/appearance" }, "spriteAnimation": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" }, "content": { "$ref": "#/$defs/localized" }, "textStyle": { "$ref": "#/$defs/textStyle" } } }
       ]
+    },
+    "textStyle": {
+      "type": "object",
+      "properties": {
+        "fontSize": { "type": "number", "minimum": 0.15, "maximum": 4 },
+        "align": { "enum": ["left", "center", "right"] },
+        "verticalAlign": { "enum": ["top", "middle", "bottom"] },
+        "background": { "$ref": "#/$defs/color" },
+        "borderColor": { "$ref": "#/$defs/color" },
+        "padding": { "type": "number", "minimum": 0, "maximum": 2 },
+        "uppercase": { "type": "boolean" }
+      }
     },
     "cutsceneKeyframe": {
       "type": "object",

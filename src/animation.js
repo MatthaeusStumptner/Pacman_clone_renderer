@@ -2,6 +2,23 @@ export function animationById(appearance, id) {
   return appearance?.animations?.find((animation) => animation.id === id) ?? null;
 }
 
+export function animationKeyframes(animation) {
+  if (animation?.keyframes?.length) return animation.keyframes;
+  const fps = Math.max(0.25, Number(animation?.fps) || 6);
+  return (animation?.frames ?? []).map((frame, index) => ({
+    id: `keyframe-${index + 1}`,
+    time: index / fps,
+    easing: 'step',
+    pixels: frame.pixels,
+  }));
+}
+
+export function animationDuration(animation) {
+  const keyframes = animationKeyframes(animation);
+  const fallback = Math.max(1 / Math.max(0.25, Number(animation?.fps) || 6), (keyframes.at(-1)?.time ?? 0) + 1 / Math.max(0.25, Number(animation?.fps) || 6));
+  return Math.max(fallback, Number(animation?.duration) || 0);
+}
+
 export const ACTOR_ANIMATION_STATES = Object.freeze(['idle', 'up', 'right', 'down', 'left']);
 
 export function actorAnimationState(actor = {}) {
@@ -23,8 +40,10 @@ export function stateAnimationId(appearance, state = 'idle') {
 export function selectAppearanceFrame(appearance, { animationId = '', state = 'idle', elapsed = 0 } = {}) {
   if (!appearance) return null;
   const animation = animationById(appearance, animationId) ?? animationById(appearance, stateAnimationId(appearance, state));
-  if (!animation?.frames?.length) return appearance.pixels;
-  const rawIndex = Math.max(0, Math.floor(Math.max(0, Number(elapsed) || 0) * animation.fps));
-  const index = animation.loop ? rawIndex % animation.frames.length : Math.min(animation.frames.length - 1, rawIndex);
-  return animation.frames[index].pixels;
+  const keyframes = animationKeyframes(animation);
+  if (!keyframes.length) return appearance.pixels;
+  const duration = animationDuration(animation);
+  const rawTime = Math.max(0, Number(elapsed) || 0);
+  const time = animation.loop && duration > 0 ? rawTime % duration : Math.min(duration, rawTime);
+  return ([...keyframes].reverse().find((frame) => frame.time <= time) ?? keyframes[0]).pixels;
 }

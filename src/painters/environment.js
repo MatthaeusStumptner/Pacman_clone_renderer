@@ -142,16 +142,6 @@ function themeElementAnimation(level, id, fallback) {
   return level.theme.elements?.find((element) => element.id === id)?.animation ?? fallback;
 }
 
-function applyMotionAnimation(context, animation, elapsed, centerX, centerY, tile) {
-  const phase = elapsed * Math.PI * 2 * animation.speed;
-  context.translate(centerX, centerY);
-  if (animation.type === 'bob') context.translate(0, Math.sin(phase) * tile * animation.amplitude);
-  if (animation.type === 'pulse') { const scale = 1 + Math.sin(phase) * animation.amplitude; context.scale(scale, scale); }
-  if (animation.type === 'spin') context.rotate(phase * animation.amplitude);
-  if (animation.type === 'blink') context.globalAlpha *= Math.sin(phase) > 0 ? 1 : Math.max(0.08, 1 - animation.amplitude);
-  context.translate(-centerX, -centerY);
-}
-
 function drawStage(context, level, elapsed) {
   const { columns, tileSize } = level.board;
   const width = 9 * tileSize;
@@ -201,7 +191,7 @@ export function zauberbergNoteRectangles(left, top, width, bounce = 0) {
   ];
 }
 
-export function drawEnvironment(context, level, grid, elapsed = 0) {
+export function drawEnvironment(context, level, grid, elapsed = 0, options = {}) {
   const { columns, rows, tileSize } = level.board;
   context.fillStyle = '#0b1620';
   context.fillRect(0, 0, columns * tileSize, rows * tileSize);
@@ -216,28 +206,52 @@ export function drawEnvironment(context, level, grid, elapsed = 0) {
   else if (level.theme.landmark === 'zauberberg') drawStage(context, level, elapsed);
   else drawDogPark(context, level, grid);
   if (level.theme.landmark === 'brahmahof-home') drawHome(context, level);
-  drawDecorations(context, level, elapsed);
+  drawDecorations(context, level, elapsed, options.language);
 }
 
-function drawDecorations(context, level, elapsed) {
+export function drawDecorations(context, level, elapsed, language = 'standard') {
   const tile = level.board.tileSize;
-  level.decorations.forEach((item) => {
+  level.decorations.forEach((item) => drawDecoration(context, item, tile, elapsed, language));
+}
+
+function wrapText(context, value, maximumWidth) {
+  const words = String(value || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  words.forEach((word) => {
+    const next = lines.length ? `${lines.at(-1)} ${word}` : word;
+    if (lines.length && context.measureText(next).width > maximumWidth) lines.push(word);
+    else if (lines.length) lines[lines.length - 1] = next;
+    else lines.push(word);
+  });
+  return lines.length ? lines : [''];
+}
+
+export function drawDecoration(context, item, tile, elapsed = 0, language = 'standard') {
     const left = item.x * tile;
     const top = item.y * tile;
     const width = item.width * tile;
     const height = item.height * tile;
     context.save();
     const animation = item.animation ?? { type: 'none', speed: 1, amplitude: 0.15 };
-    const phase = elapsed * Math.PI * 2 * animation.speed;
     const centerX = left + width / 2; const centerY = top + height / 2;
-    context.translate(centerX, centerY);
-    if (animation.type === 'bob') context.translate(0, Math.sin(phase) * tile * animation.amplitude);
-    if (animation.type === 'pulse') { const scale = 1 + Math.sin(phase) * animation.amplitude; context.scale(scale, scale); }
-    if (animation.type === 'spin') context.rotate(phase * animation.amplitude);
-    if (animation.type === 'blink') context.globalAlpha = Math.sin(phase) > 0 ? 1 : Math.max(0.08, 1 - animation.amplitude);
-    context.translate(-centerX, -centerY);
+    applyMotionAnimation(context, animation, elapsed, centerX, centerY, tile);
     context.fillStyle = item.color;
-    if (item.appearance && drawPixelSprite(context, item.appearance, { left, top, width, height }, { animationId: item.spriteAnimation ?? '', state: 'idle', elapsed })) {
+    if (item.type === 'text') {
+      const style = item.textStyle ?? {};
+      const padding = (Number(style.padding) || 0) * tile;
+      const textWidth = Math.max(1, width - padding * 2);
+      const fontSize = Math.max(4, (Number(style.fontSize) || 0.5) * tile);
+      const value = item.content?.[language] || item.content?.standard || item.label || '';
+      context.fillStyle = style.background || '#071016'; context.globalAlpha *= 0.88;
+      context.fillRect(left, top, width, height); context.globalAlpha /= 0.88;
+      context.strokeStyle = style.borderColor || item.color; context.lineWidth = Math.max(1, tile * 0.06); context.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
+      context.fillStyle = item.color; context.font = `${fontSize}px monospace`; context.textAlign = style.align || 'center'; context.textBaseline = 'top';
+      const lines = wrapText(context, style.uppercase ? value.toUpperCase() : value, textWidth);
+      const lineHeight = fontSize * 1.18; const blockHeight = lines.length * lineHeight;
+      const startY = style.verticalAlign === 'top' ? top + padding : style.verticalAlign === 'bottom' ? top + height - padding - blockHeight : top + (height - blockHeight) / 2;
+      const textX = style.align === 'left' ? left + padding : style.align === 'right' ? left + width - padding : left + width / 2;
+      lines.forEach((line, index) => context.fillText(line, textX, startY + index * lineHeight, textWidth));
+    } else if (item.appearance && drawPixelSprite(context, item.appearance, { left, top, width, height }, { animationId: item.spriteAnimation ?? '', state: 'idle', elapsed })) {
       // Freely authored sprite objects use the same animation format as actors.
     } else if (item.type === 'tree') {
       context.fillStyle = '#5c3b2a'; context.fillRect(left + width * 0.43, top + height * 0.48, Math.max(2, width * 0.14), height * 0.42);
@@ -266,7 +280,18 @@ function drawDecorations(context, level, elapsed) {
       context.fillStyle = '#071016'; context.font = `${Math.max(5, Math.floor(tile * 0.22))}px monospace`; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(item.label.slice(0, 12), left + width / 2, top + height * 0.3);
     }
     context.restore();
-  });
+}
+
+export function drawDecorationPreview(context, item, bounds, elapsed = 0, language = 'standard') {
+  const scaleX = bounds.width / Math.max(1, item.width);
+  const scaleY = bounds.height / Math.max(1, item.height);
+  const tile = Math.max(1, Math.floor(Math.min(scaleX, scaleY)));
+  const previewItem = {
+    ...item,
+    x: (bounds.left + (bounds.width - item.width * tile) / 2) / tile,
+    y: (bounds.top + (bounds.height - item.height * tile) / 2) / tile,
+  };
+  drawDecoration(context, previewItem, tile, elapsed, language);
 }
 
 export function drawEditorGrid(context, level) {
@@ -289,3 +314,4 @@ export function drawEditorGrid(context, level) {
   context.restore();
 }
 import { drawPixelSprite } from './sprites.js';
+import { applyMotionAnimation } from '../motion-animation.js';
