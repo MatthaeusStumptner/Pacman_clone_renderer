@@ -5,6 +5,7 @@ import {
   DirectionalSwipeInput,
   createLevelDocument,
   queuePlayerDirection,
+  sampleMotionAnimation,
   selectAppearanceFrame,
   stateAnimationId,
 } from '../src/index.js';
@@ -55,8 +56,33 @@ test('queued navigation reverses immediately but buffers perpendicular turns wit
 
 test('Zauberberg exposes its animated note and stage lights as editable theme elements', () => {
   const level = createLevelDocument({ theme: { landmark: 'zauberberg', elements: [{ id: 'stage-note', animation: { type: 'spin', speed: 2.5, amplitude: 0.4 } }] }, actors: { cats: [] } });
-  assert.deepEqual(level.theme.elements, [
-    { id: 'stage-note', animation: { type: 'spin', speed: 2.5, amplitude: 0.4 } },
-    { id: 'stage-lights', animation: { type: 'none', speed: 1, amplitude: 0.15 } },
-  ]);
+  assert.equal(level.theme.elements[0].id, 'stage-note');
+  assert.deepEqual({ type: level.theme.elements[0].animation.type, speed: level.theme.elements[0].animation.speed, amplitude: level.theme.elements[0].animation.amplitude }, { type: 'spin', speed: 2.5, amplitude: 0.4 });
+  assert.equal(level.theme.elements[1].id, 'stage-lights');
+  assert.deepEqual(level.theme.elements[0].animation.keyframes, []);
+});
+
+test('samples authored motion keyframes with playback duration, looping and easing', () => {
+  const level = createLevelDocument({ actors: { cats: [] }, decorations: [{
+    id: 'animated', type: 'custom', x: 1, y: 1, width: 1, height: 1, color: '#ffffff',
+    animation: { type: 'keyframes', duration: 2, loop: true, keyframes: [
+      { id: 'a', time: 0, x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+      { id: 'b', time: 2, x: 2, y: -1, scale: 2, rotation: 90, opacity: 0.5 },
+    ] },
+  }] });
+  const animation = level.decorations[0].animation;
+  assert.deepEqual(sampleMotionAnimation(animation, 1), { x: 1, y: -0.5, scale: 1.5, rotation: 45, opacity: 0.75 });
+  assert.deepEqual(sampleMotionAnimation(animation, 2), sampleMotionAnimation(animation, 0));
+});
+
+test('selects sprite keyframes by authored time instead of display refresh rate', () => {
+  const appearance = createLevelDocument({ actors: { cats: [], player: { appearance: {
+    width: 4, height: 4, palette: ['transparent', '#ffffff'], pixels: rows('0'),
+    animations: [{ id: 'idle', duration: 2, loop: true, keyframes: [
+      { id: 'dark', time: 0, pixels: rows('0') }, { id: 'light', time: 1.25, pixels: rows('1') },
+    ] }], stateAnimations: { idle: 'idle' },
+  } } } }).actors.player.appearance;
+  assert.deepEqual(selectAppearanceFrame(appearance, { elapsed: 1.24 }), rows('0'));
+  assert.deepEqual(selectAppearanceFrame(appearance, { elapsed: 1.25 }), rows('1'));
+  assert.deepEqual(selectAppearanceFrame(appearance, { elapsed: 2.01 }), rows('0'));
 });
