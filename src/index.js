@@ -18,6 +18,7 @@ export {
 export { PassauPixelRenderer } from './passau-pixel-renderer.js';
 export { cutsceneById, sampleCutscene } from './cutscene.js';
 export { drawPixelSprite } from './painters/sprites.js';
+export { drawActorPreview } from './actor-preview.js';
 export { drawDecoration, drawDecorationPreview } from './painters/environment.js';
 
 export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, animationDuration, animationKeyframes, selectAppearanceFrame, stateAnimationId } from './animation.js';
