@@ -237,8 +237,11 @@ export function drawDecoration(context, item, tile, elapsed = 0, language = 'sta
       const textWidth = Math.max(1, width - padding * 2);
       const fontSize = Math.max(4, (Number(style.fontSize) || 0.5) * tile);
       const value = item.content?.[language] || item.content?.standard || item.label || '';
-      context.fillStyle = style.background || '#071016'; context.globalAlpha *= 0.88;
-      context.fillRect(left, top, width, height); context.globalAlpha /= 0.88;
+      const backgroundOpacity = Math.max(0, Math.min(1, Number.isFinite(style.backgroundOpacity) ? style.backgroundOpacity : 0.88));
+      if (backgroundOpacity > 0) {
+        context.save(); context.globalAlpha *= backgroundOpacity; context.fillStyle = style.background || '#071016';
+        context.fillRect(left, top, width, height); context.restore();
+      }
       context.strokeStyle = style.borderColor || item.color; context.lineWidth = Math.max(1, tile * 0.06); context.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
       context.fillStyle = item.color; context.font = `600 ${fontSize}px "Courier New", monospace`; context.textAlign = style.align || 'center'; context.textBaseline = 'top';
       const lineHeight = fontSize * 1.18;
