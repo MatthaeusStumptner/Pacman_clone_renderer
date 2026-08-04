@@ -114,15 +114,17 @@ test('preserves reusable sprite objects and samples level-bound cutscenes', () =
   assert.equal(sample.done, false);
 });
 
-test('preserves freely positioned localized text blocks and sprite event visuals', () => {
+test('preserves freely positioned and scaled localized text blocks and sprite event visuals', () => {
   const level = valid();
   const appearance = { width: 4, height: 4, palette: ['transparent', '#ffffff'], pixels: rows('1'), animations: [{ id: 'idle', duration: 1, keyframes: [{ id: 'keyframe-1', time: 0, pixels: rows('1') }] }] };
-  level.decorations = [{ id: 'copy', type: 'text', x: 1, y: 2, width: 5, height: 2, color: '#ffffff', content: { standard: 'Freier Text', dialect: 'Freia Text' }, textStyle: { fontSize: 0.7, align: 'left', background: '#071016', borderColor: '#55d9dd' } }];
+  level.decorations = [{ id: 'copy', type: 'text', x: 1.375, y: 2.625, width: 5.5, height: 2.25, color: '#ffffff', content: { standard: 'Freier Text', dialect: 'Freia Text' }, textStyle: { fontSize: 0.7, align: 'left', background: '#071016', borderColor: '#55d9dd' } }];
   level.events = [{ id: 'sprite-event', name: { standard: 'Objekt', dialect: 'Objekt' }, message: { standard: 'Da!', dialect: 'Do!' }, trigger: { type: 'time', seconds: 1 }, visual: { type: 'custom', assetId: 'spark', appearance, spriteAnimation: 'idle', animation: { type: 'pulse', speed: 1, amplitude: 0.1 } } }];
   const normalized = createLevelDocument(level);
   assert.equal(normalized.decorations[0].type, 'text');
   assert.equal(normalized.decorations[0].content.dialect, 'Freia Text');
   assert.equal(normalized.decorations[0].textStyle.align, 'left');
+  assert.equal(normalized.decorations[0].x, 1.375);
+  assert.equal(normalized.decorations[0].height, 2.25);
   assert.equal(normalized.events[0].visual.assetId, 'spark');
   assert.equal(normalized.events[0].visual.appearance.animations[0].keyframes.length, 1);
 });
