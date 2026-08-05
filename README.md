@@ -24,7 +24,9 @@ Ein Level ist reines JSON mit `kind: "franz-lola-level"` und `schemaVersion: 1`.
 - explizite Spielerzustände `idle`, `up`, `right`, `down` und `left`, die frei auf Sprite-Animationen abgebildet werden
 - frei konfigurierbares Spieler- und Katzenverhalten (Steuerung, Jagdstrategie, Ziel, Tempo, Voraussicht und Zufall)
 - Dekorationen wie Bäume, Bänke, Lampen, Schilder, Wasser oder freie Symbole mit Schwebe-, Puls-, Blink-, Dreh- und frei definierbarer Transform-Keyframe-Bewegung
-- stufenlos positionier- und skalierbare zweisprachige Textblöcke mit Größe, Ausrichtung, optional transparentem Hintergrund, Rahmen und eigener Animation
+- stapelbare Canvas2D-Effekte (`glitch`, `neon`, `hologram`, `echo`, `sparkle`) für Figuren, Objekte und Ereignissymbole
+- animierbare Levelränder mit Wasserströmung, springenden Fischen, Booten, Blättern, Glühwürmchen, Nebel, Stadtlichtern, Vögeln, Dampf, Funken und Bühnenpuls
+- stufenlos positionier- und skalierbare zweisprachige Textblöcke mit Größe, Ausrichtung, optional transparentem Hintergrund oder Rahmen und eigener Animation
 - frei definierbare Ereignisse mit Triggerzonen, Richtungsfolgen oder Zeitpunkten, lokalisierten Standard-/Dialekttexten, Belohnungen und Sichtbarkeitsregeln
 - eingebaute Pixel-Ereignissymbole für Eisvogel, Pfote und Kirchenglocke sowie beliebige Sprite-Objekte aus der gemeinsamen Bibliothek
 - levelgebundene Intro-, Übergangs- und Outro-Cutscenes mit Kamera-, Figuren-, Objekt- und Dialogspuren

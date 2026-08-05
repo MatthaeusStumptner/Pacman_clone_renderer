@@ -20,6 +20,8 @@ export { cutsceneById, sampleCutscene } from './cutscene.js';
 export { drawPixelSprite } from './painters/sprites.js';
 export { drawActorPreview } from './actor-preview.js';
 export { drawDecoration, drawDecorationPreview } from './painters/environment.js';
+export { EDGE_EFFECT_TYPES, drawLevelEdgeEffects } from './painters/edge-effects.js';
+export { VISUAL_EFFECT_TYPES, normalizeVisualEffects, drawWithVisualEffects } from './visual-effects.js';
 
 export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, animationDuration, animationKeyframes, selectAppearanceFrame, stateAnimationId } from './animation.js';
 export { applyMotionAnimation, sampleMotionAnimation } from './motion-animation.js';

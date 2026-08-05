@@ -1,6 +1,8 @@
 import { drawPixelSprite } from './sprites.js';
+import { drawLevelEdgeEffects } from './edge-effects.js';
 import { applyMotionAnimation } from '../motion-animation.js';
 import { layoutCanvasText } from '../text-layout.js';
+import { drawWithVisualEffects } from '../visual-effects.js';
 
 function isWall(grid, x, y) {
   return Boolean(grid[y]?.[x]);
@@ -205,6 +207,7 @@ export function drawEnvironment(context, level, grid, elapsed = 0, options = {})
       else drawStreetTile(context, level, grid, x, y);
     }
   }
+  drawLevelEdgeEffects(context, level, elapsed);
   if (level.theme.landmark === 'bschuett') drawBschuett(context, level);
   else if (level.theme.landmark === 'tabakfabrik') drawFactory(context, level);
   else if (level.theme.landmark === 'zauberberg') drawStage(context, level, elapsed);
@@ -230,6 +233,7 @@ export function drawDecoration(context, item, tile, elapsed = 0, language = 'sta
     const animation = item.animation ?? { type: 'none', speed: 1, amplitude: 0.15 };
     const centerX = left + width / 2; const centerY = top + height / 2;
     applyMotionAnimation(context, animation, elapsed, centerX, centerY, tile);
+    drawWithVisualEffects(context, item.effects, { left, top, width, height }, elapsed, () => {
     context.fillStyle = item.color;
     if (item.type === 'text') {
       const style = item.textStyle ?? {};
@@ -242,7 +246,10 @@ export function drawDecoration(context, item, tile, elapsed = 0, language = 'sta
         context.save(); context.globalAlpha *= backgroundOpacity; context.fillStyle = style.background || '#071016';
         context.fillRect(left, top, width, height); context.restore();
       }
-      context.strokeStyle = style.borderColor || item.color; context.lineWidth = Math.max(1, tile * 0.06); context.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
+      const borderOpacity = Math.max(0, Math.min(1, Number.isFinite(style.borderOpacity) ? style.borderOpacity : 0));
+      if (borderOpacity > 0) {
+        context.save(); context.globalAlpha *= borderOpacity; context.strokeStyle = style.borderColor || item.color; context.lineWidth = Math.max(1, tile * 0.06); context.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1); context.restore();
+      }
       context.fillStyle = item.color; context.font = `600 ${fontSize}px "Courier New", monospace`; context.textAlign = style.align || 'center'; context.textBaseline = 'top';
       const lineHeight = fontSize * 1.18;
       const lines = layoutCanvasText(context, style.uppercase ? value.toUpperCase() : value, textWidth, lineHeight);
@@ -280,6 +287,7 @@ export function drawDecoration(context, item, tile, elapsed = 0, language = 'sta
       context.fillStyle = '#071016'; context.font = `${Math.max(5, Math.floor(tile * 0.22))}px monospace`; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(item.label.slice(0, 12), left + width / 2, top + height * 0.3);
     }
     context.restore();
+    });
 }
 
 export function drawDecorationPreview(context, item, bounds, elapsed = 0, language = 'standard') {

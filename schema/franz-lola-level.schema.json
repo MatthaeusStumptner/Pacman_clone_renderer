@@ -48,7 +48,8 @@
             "water": { "$ref": "#/$defs/color" }
           }
         },
-        "elements": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/themeElement" } }
+        "elements": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/themeElement" } },
+        "edgeEffects": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/edgeEffect" } }
       }
     },
     "actors": {
@@ -162,6 +163,31 @@
         "animation": { "$ref": "#/$defs/motionAnimation" }
       }
     },
+    "visualEffect": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "type": { "enum": ["glitch", "neon", "hologram", "echo", "sparkle"] },
+        "intensity": { "type": "number", "minimum": 0.05, "maximum": 1 },
+        "speed": { "type": "number", "minimum": 0.1, "maximum": 8 },
+        "color": { "$ref": "#/$defs/color" }
+      }
+    },
+    "edgeEffect": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "type": { "enum": ["water-flow", "fish", "boat", "leaves", "fireflies", "mist", "city-lights", "birds", "steam", "sparks", "stage-pulse"] },
+        "side": { "enum": ["left", "right", "both"] },
+        "speed": { "type": "number", "minimum": 0.1, "maximum": 8 },
+        "intensity": { "type": "number", "minimum": 0.05, "maximum": 1 },
+        "count": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "color": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color" }
+      }
+    },
     "actorBehavior": {
       "type": "object",
       "properties": {
@@ -192,7 +218,7 @@
     "actor": {
       "allOf": [
         { "$ref": "#/$defs/point" },
-        { "type": "object", "properties": { "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "renderer": { "type": "string" }, "animation": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" }, "behavior": { "$ref": "#/$defs/actorBehavior" } } }
+        { "type": "object", "properties": { "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "renderer": { "type": "string" }, "animation": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" }, "effects": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/visualEffect" } }, "behavior": { "$ref": "#/$defs/actorBehavior" } } }
       ]
     },
     "motionAnimation": {
@@ -244,7 +270,8 @@
         "assetId": { "type": "string" },
         "appearance": { "$ref": "#/$defs/appearance" },
         "spriteAnimation": { "type": "string" },
-        "animation": { "$ref": "#/$defs/motionAnimation" }
+        "animation": { "$ref": "#/$defs/motionAnimation" },
+        "effects": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/visualEffect" } }
       }
     },
     "levelEvent": {
@@ -264,7 +291,7 @@
     "decoration": {
       "allOf": [
         { "type": "object", "required": ["x", "y", "width", "height"], "properties": { "x": { "type": "number", "minimum": 0 }, "y": { "type": "number", "minimum": 0 }, "width": { "type": "number", "minimum": 0.25 }, "height": { "type": "number", "minimum": 0.25 } } },
-        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "assetId": { "type": "string" }, "name": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom", "text"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "layer": { "enum": ["ground", "scenery", "foreground"] }, "locked": { "type": "boolean" }, "appearance": { "$ref": "#/$defs/appearance" }, "spriteAnimation": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" }, "content": { "$ref": "#/$defs/localized" }, "textStyle": { "$ref": "#/$defs/textStyle" } } }
+        { "type": "object", "required": ["id", "type", "color"], "properties": { "id": { "type": "string" }, "assetId": { "type": "string" }, "name": { "type": "string" }, "type": { "enum": ["tree", "bench", "lamp", "flower", "sign", "rock", "water", "custom", "text"] }, "color": { "$ref": "#/$defs/color" }, "label": { "type": "string" }, "layer": { "enum": ["ground", "scenery", "foreground"] }, "locked": { "type": "boolean" }, "appearance": { "$ref": "#/$defs/appearance" }, "spriteAnimation": { "type": "string" }, "animation": { "$ref": "#/$defs/motionAnimation" }, "effects": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/visualEffect" } }, "content": { "$ref": "#/$defs/localized" }, "textStyle": { "$ref": "#/$defs/textStyle" } } }
       ]
     },
     "textStyle": {
@@ -276,6 +303,7 @@
         "background": { "$ref": "#/$defs/color" },
         "backgroundOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
         "borderColor": { "$ref": "#/$defs/color" },
+        "borderOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
         "padding": { "type": "number", "minimum": 0, "maximum": 2 },
         "uppercase": { "type": "boolean" }
       }

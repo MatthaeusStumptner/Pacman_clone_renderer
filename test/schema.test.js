@@ -20,4 +20,8 @@ test('ships a machine-readable schema for the public level contract', async () =
   assert.ok(schema.$defs.cutsceneTrack);
   assert.ok(schema.properties.cutscenes);
   assert.ok(schema.$defs.decoration.properties === undefined || schema.$defs.decoration.allOf[1].properties.appearance);
+  assert.ok(schema.$defs.visualEffect);
+  assert.ok(schema.$defs.edgeEffect);
+  assert.ok(schema.properties.theme.properties.edgeEffects);
+  assert.equal(schema.$defs.textStyle.properties.borderOpacity.maximum, 1);
 });
