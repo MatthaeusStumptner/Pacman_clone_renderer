@@ -145,7 +145,11 @@ test('preserves freely positioned and scaled localized text blocks and sprite ev
 
 test('normalizes stackable visual effects, animated level edges and borderless text', () => {
   const level = valid();
-  level.theme.edgeEffects = [
+  level.board.walls = [{
+    id: 'backstein-links', name: 'Linker Backsteinblock', x: 2, y: 2, width: 3, height: 2,
+    useThemeColor: false, color: '#553322', accent: '#f5c451', pattern: 'brick', opacity: 0.65,
+    effects: [{ id: 'wand-echo', type: 'echo', intensity: 0.35, speed: 1.2, color: '#55d9dd' }],
+  }];  level.theme.edgeEffects = [
     { id: 'Ilz Wellen', type: 'water-flow', side: 'left', speed: 99, intensity: 0.7, count: 4, color: '#2379a3', accent: '#f5c451' },
     { id: 'boot', type: 'boat', side: 'both', speed: 0.8, intensity: 0.6, count: 1, color: '#d8b27b', accent: '#f3eee0' },
   ];
@@ -157,7 +161,10 @@ test('normalizes stackable visual effects, animated level edges and borderless t
     effects: [{ id: 'schein', type: 'neon', intensity: 0.5, speed: 1, color: '#55d9dd' }],
   }];
   const normalized = createLevelDocument(level);
-  assert.equal(normalized.theme.edgeEffects.length, 2);
+  assert.equal(normalized.board.walls[0].id, 'backstein-links');
+  assert.equal(normalized.board.walls[0].pattern, 'brick');
+  assert.equal(normalized.board.walls[0].useThemeColor, false);
+  assert.equal(normalized.board.walls[0].effects[0].type, 'echo');  assert.equal(normalized.theme.edgeEffects.length, 2);
   assert.equal(normalized.theme.edgeEffects[0].id, 'ilz-wellen');
   assert.equal(normalized.theme.edgeEffects[0].speed, 8);
   assert.equal(normalized.actors.cats[0].effects[0].type, 'glitch');

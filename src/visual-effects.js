@@ -36,19 +36,20 @@ function drawGlitch(context, effect, bounds, elapsed, draw) {
     const jitter = Math.sin(elapsed * effect.speed * 31 + index * 12.7) * bounds.width * 0.12 * effect.intensity;
     context.save();
     context.beginPath(); context.rect(bounds.left - 4, bounds.top + index * sliceHeight, bounds.width + 8, sliceHeight + 1); context.clip();
-    context.globalAlpha *= 0.22 + effect.intensity * 0.24;
+    context.globalAlpha *= 0.14 + effect.intensity * 0.2;
     context.globalCompositeOperation = 'screen';
-    context.fillStyle = effect.color;
-    context.fillRect(bounds.left - 4, bounds.top + index * sliceHeight, bounds.width + 8, sliceHeight + 1);
     context.translate(Math.round(jitter), 0); draw(); context.restore();
   }
 }
 
-function drawHologramLines(context, effect, bounds, elapsed) {
-  const spacing = Math.max(3, Math.round(7 - effect.intensity * 4));
-  const offset = Math.floor(elapsed * effect.speed * 18) % spacing;
-  context.save(); context.globalAlpha *= 0.1 + effect.intensity * 0.16; context.fillStyle = effect.color;
-  for (let y = bounds.top + offset; y < bounds.top + bounds.height; y += spacing) context.fillRect(bounds.left, y, bounds.width, 1);
+function drawHologramGhost(context, effect, bounds, elapsed, draw) {
+  const distance = Math.max(1, Math.round(Math.min(bounds.width, bounds.height) * 0.05 * effect.intensity));
+  const phase = Math.sin(elapsed * effect.speed * 9) >= 0 ? 1 : -1;
+  context.save();
+  context.globalAlpha *= 0.08 + effect.intensity * 0.12;
+  context.globalCompositeOperation = 'screen';
+  context.translate(distance * phase, -distance);
+  draw();
   context.restore();
 }
 
@@ -65,38 +66,38 @@ function drawSparkles(context, effect, bounds, elapsed) {
   context.restore();
 }
 
-function drawNeonHalo(context, effect, bounds, elapsed) {
+function drawNeonGlow(context, effect, bounds, elapsed, draw) {
   const pulse = 0.7 + (Math.sin(elapsed * effect.speed * 4) * 0.5 + 0.5) * 0.3;
-  const inset = Math.max(1, Math.min(bounds.width, bounds.height) * 0.08);
-  context.save();
-  context.strokeStyle = effect.color;
-  context.globalAlpha *= (0.14 + effect.intensity * 0.2) * pulse;
-  context.lineWidth = Math.max(2, inset * 1.6);
-  context.strokeRect(bounds.left - inset, bounds.top - inset, bounds.width + inset * 2, bounds.height + inset * 2);
-  context.globalAlpha *= 0.55;
-  context.lineWidth = Math.max(1, inset * 0.7);
-  context.strokeRect(bounds.left - inset * 2, bounds.top - inset * 2, bounds.width + inset * 4, bounds.height + inset * 4);
-  context.restore();
+  const distance = Math.max(1, Math.round(Math.min(bounds.width, bounds.height) * (0.025 + effect.intensity * 0.035)));
+  [[-distance, 0], [distance, 0], [0, -distance], [0, distance]].forEach(([x, y]) => {
+    context.save();
+    context.globalAlpha *= (0.035 + effect.intensity * 0.055) * pulse;
+    context.globalCompositeOperation = 'screen';
+    context.translate(x, y);
+    draw();
+    context.restore();
+  });
 }
 
 export function drawWithVisualEffects(context, value, bounds, elapsed, draw) {
   const effects = normalizeVisualEffects(value);
   if (!effects.length) return draw();
-  effects.filter((effect) => effect.type === 'echo').forEach((effect) => drawEcho(context, effect, bounds, elapsed, draw));
 
   context.save();
-  const neon = effects.find((effect) => effect.type === 'neon');
   const hologram = effects.find((effect) => effect.type === 'hologram');
-  if (neon) drawNeonHalo(context, neon, bounds, elapsed);
   if (hologram) {
     context.globalAlpha *= 0.58 + (Math.sin(elapsed * hologram.speed * 8) * 0.5 + 0.5) * 0.3;
     context.globalCompositeOperation = 'screen';
   }
   const result = draw();
   context.restore();
+  if (result === false) return false;
 
+  effects.filter((effect) => effect.type === 'echo').forEach((effect) => drawEcho(context, effect, bounds, elapsed, draw));
+  const neon = effects.find((effect) => effect.type === 'neon');
+  if (neon) drawNeonGlow(context, neon, bounds, elapsed, draw);
+  if (hologram) drawHologramGhost(context, hologram, bounds, elapsed, draw);
   effects.filter((effect) => effect.type === 'glitch').forEach((effect) => drawGlitch(context, effect, bounds, elapsed, draw));
-  effects.filter((effect) => effect.type === 'hologram').forEach((effect) => drawHologramLines(context, effect, bounds, elapsed));
   effects.filter((effect) => effect.type === 'sparkle').forEach((effect) => drawSparkles(context, effect, bounds, elapsed));
   return result;
 }

@@ -139,7 +139,6 @@ function normalizeMotionAnimation(value, fallback = {}) {
 
 function normalizeThemeElements(value, landmark) {
   const defaults = landmark === 'zauberberg' ? [
-    { id: 'stage-note', animation: { type: 'bob', speed: 1.1, amplitude: 0.125 } },
     { id: 'stage-lights', animation: { type: 'none', speed: 1, amplitude: 0.15 } },
   ] : [];
   const source = Array.isArray(value) ? value : [];
@@ -359,12 +358,24 @@ export function createLevelDocument(input = {}) {
       tunnelRows: [...new Set((Array.isArray(input.board?.tunnelRows) ? input.board.tunnelRows : [Math.floor(rows / 2)])
         .map((row) => integer(row, -1))
         .filter((row) => row >= 0 && row < rows))],
-      walls: walls.map((wall) => ({
-        x: integer(wall?.x, 1),
-        y: integer(wall?.y, 1),
-        width: Math.max(1, integer(wall?.width, 1)),
-        height: Math.max(1, integer(wall?.height, 1)),
-      })),
+      walls: walls.map((wall, index) => {
+        const normalized = {
+          x: integer(wall?.x, 1),
+          y: integer(wall?.y, 1),
+          width: Math.max(1, integer(wall?.width, 1)),
+          height: Math.max(1, integer(wall?.height, 1)),
+        };
+        if (text(wall?.id).trim()) normalized.id = slug(wall.id, 'wall-' + (index + 1));
+        if (text(wall?.name).trim()) normalized.name = text(wall.name).trim();
+        if (color(wall?.color, '')) normalized.color = wall.color;
+        if (color(wall?.accent, '')) normalized.accent = wall.accent;
+        if (wall?.useThemeColor === false) normalized.useThemeColor = false;
+        if (['theme', 'solid', 'brick', 'metal', 'windows'].includes(wall?.pattern) && wall.pattern !== 'theme') normalized.pattern = wall.pattern;
+        if (Number.isFinite(Number(wall?.opacity)) && Number(wall.opacity) !== 1) normalized.opacity = clamp(finite(wall.opacity, 1), 0.15, 1);
+        const effects = normalizeVisualEffects(wall?.effects);
+        if (effects.length) normalized.effects = effects;
+        return normalized;
+      }),
     },
     theme: {
       id: text(input.theme?.id, 'neighborhood'),

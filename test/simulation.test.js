@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FixedStepLoop, LevelSimulation, createLevelDocument, selectAppearanceFrame } from '../src/index.js';
-import { zauberbergNoteRectangles, zauberbergSpotlightPolygons } from '../src/painters/environment.js';
+import { zauberbergSpotlightPolygons } from '../src/painters/environment.js';
 
 function openLevel(extra = {}) {
   return createLevelDocument({
@@ -45,14 +45,6 @@ test('selects looping sprite animation frames deterministically', () => {
   assert.deepEqual(selectAppearanceFrame(appearance, { animationId: 'walk', elapsed: 0 }), ['1']);
   assert.deepEqual(selectAppearanceFrame(appearance, { animationId: 'walk', elapsed: 0.6 }), ['2']);
   assert.deepEqual(selectAppearanceFrame(appearance, { animationId: 'walk', elapsed: 1.1 }), ['1']);
-});
-
-test('Zauberberg note consists of stem, beam and note head and bounces as one symbol', () => {
-  const base = zauberbergNoteRectangles(100, 50, 200, 0);
-  const bounced = zauberbergNoteRectangles(100, 50, 200, 3);
-  assert.equal(base.length, 3);
-  assert.deepEqual(base.map((rect) => rect.slice(2)), [[4, 21], [11, 4], [4, 7]]);
-  assert.deepEqual(bounced.map((rect, index) => rect[1] - base[index][1]), [3, 3, 3]);
 });
 
 test('Zauberberg restores both original stage spotlights', () => {
