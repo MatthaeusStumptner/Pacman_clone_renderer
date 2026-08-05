@@ -19,7 +19,7 @@ Ein Level ist reines JSON mit `kind: "franz-lola-level"` und `schemaVersion: 1`.
 - Passau-Koordinaten und Gebietsangaben
 - freie Rastergröße, Tunnelzeilen und rechteckige Wandsegmente
 - Landmarken und vollständige Farbpaletten
-- Franz & Lola, beliebig viele Katzen und Power-ups
+- Franz & Lola, beliebig viele Katzen und Power-ups mit stabilen, eindeutigen Actor-IDs
 - optionale Pixel-Sprites mit Palette, benannten Animationen und zeitbasierten Keyframes samt Dauer, Easing, Playback und Loop-Modus; das ältere FPS-/Frame-Format bleibt lesbar
 - explizite Spielerzustände `idle`, `up`, `right`, `down` und `left`, die frei auf Sprite-Animationen abgebildet werden
 - frei konfigurierbares Spieler- und Katzenverhalten (Steuerung, Jagdstrategie, Ziel, Tempo, Voraussicht und Zufall)

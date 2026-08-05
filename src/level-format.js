@@ -309,6 +309,14 @@ export function createLevelDocument(input = {}) {
   const powerUps = Array.isArray(input.collectibles?.powerUps)
     ? input.collectibles.powerUps
     : [{ x: 1, y: 1 }, { x: columns - 2, y: 1 }, { x: 1, y: rows - 2 }, { x: columns - 2, y: rows - 2 }];
+  const usedCatIds = new Set();
+  const uniqueCatId = (value, index) => {
+    const base = slug(value, `cat-${index + 1}`);
+    let id = base; let suffix = 2;
+    while (usedCatIds.has(id)) { id = `${base}-${suffix}`; suffix += 1; }
+    usedCatIds.add(id);
+    return id;
+  };
   const landmark = text(input.theme?.landmark, 'dog-park');
   const themeElements = normalizeThemeElements(input.theme?.elements, landmark);
 
@@ -352,6 +360,7 @@ export function createLevelDocument(input = {}) {
     },
     actors: {
       player: {
+        id: slug(input.actors?.player?.id, 'player'),
         ...normalizePoint(input.actors?.player, defaultPlayer),
         renderer: text(input.actors?.player?.renderer, 'franz-lola'),
         animation: text(input.actors?.player?.animation, ''),
@@ -359,6 +368,7 @@ export function createLevelDocument(input = {}) {
         behavior: normalizeBehavior(input.actors?.player?.behavior, 'player'),
       },
       cats: cats.map((cat, index) => ({
+        id: uniqueCatId(cat?.id, index),
         ...normalizePoint(cat, DEFAULT_CATS[index % DEFAULT_CATS.length]),
         renderer: text(cat?.renderer, 'cat'),
         animation: text(cat?.animation, ''),
