@@ -36,6 +36,19 @@ test('preserves an intentionally empty cat list', () => {
   assert.deepEqual(createLevelDocument(level).actors.cats, []);
 });
 
+test('assigns stable unique actor ids and preserves authored cat ids', () => {
+  const level = valid();
+  level.actors.player.id = 'franz-lola';
+  level.actors.cats = [
+    { id: 'rock-katze', x: 2, y: 2 },
+    { id: 'rock-katze', x: 3, y: 2 },
+    { x: 4, y: 2 },
+  ];
+  const actors = createLevelDocument(level).actors;
+  assert.equal(actors.player.id, 'franz-lola');
+  assert.deepEqual(actors.cats.map((cat) => cat.id), ['rock-katze', 'rock-katze-2', 'cat-3']);
+});
+
 test('preserves the complete base36 palette used by editable Franz and Lola sprites', () => {
   const level = valid();
   level.actors.player.appearance = {
