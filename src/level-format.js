@@ -1,4 +1,6 @@
 import { DEFAULT_DIFFICULTY_PROFILES } from './simulation/profiles.js';
+import { EDGE_EFFECT_TYPES } from './painters/edge-effects.js';
+import { normalizeVisualEffects } from './visual-effects.js';
 
 export const LEVEL_DOCUMENT_KIND = 'franz-lola-level';
 export const LEVEL_FORMAT_VERSION = 1;
@@ -144,6 +146,20 @@ function normalizeThemeElements(value, landmark) {
   const merged = [...defaults.map((fallback) => ({ ...fallback, ...(source.find((item) => item?.id === fallback.id) ?? {}) })), ...source.filter((item) => !defaults.some((fallback) => fallback.id === item?.id))];
   return merged.slice(0, 32).map((item, index) => ({ id: slug(item?.id, `theme-element-${index + 1}`), animation: normalizeMotionAnimation(item?.animation, defaults.find((fallback) => fallback.id === item?.id)?.animation) }));
 }
+function normalizeEdgeEffects(value, fallbackColor) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 16).map((effect, index) => ({
+    id: slug(effect?.id, `edge-effect-${index + 1}`),
+    type: EDGE_EFFECT_TYPES.includes(effect?.type) ? effect.type : 'water-flow',
+    side: ['left', 'right', 'both'].includes(effect?.side) ? effect.side : 'both',
+    speed: clamp(finite(effect?.speed, 1), 0.1, 8),
+    intensity: clamp(finite(effect?.intensity, 0.55), 0.05, 1),
+    count: clamp(integer(effect?.count, 5), 1, 16),
+    color: color(effect?.color, fallbackColor),
+    accent: color(effect?.accent, '#f5c451'),
+  }));
+}
+
 
 function normalizeDecoration(value, index, columns, rows) {
   const allowedTypes = ['tree', 'bench', 'lamp', 'flower', 'sign', 'rock', 'water', 'custom', 'text'];
@@ -164,6 +180,7 @@ function normalizeDecoration(value, index, columns, rows) {
     appearance: normalizeAppearance(value?.appearance),
     spriteAnimation: text(value?.spriteAnimation, ''),
     animation: normalizeMotionAnimation(value?.animation),
+    effects: normalizeVisualEffects(value?.effects),
     content: normalizeLocalized(value?.content, text(value?.label, 'Textblock')),
     textStyle: {
       fontSize: clamp(finite(value?.textStyle?.fontSize, 0.5), 0.15, 4),
@@ -172,6 +189,7 @@ function normalizeDecoration(value, index, columns, rows) {
       background: color(value?.textStyle?.background, '#071016'),
       backgroundOpacity: clamp(finite(value?.textStyle?.backgroundOpacity, 0.88), 0, 1),
       borderColor: color(value?.textStyle?.borderColor, '#55d9dd'),
+      borderOpacity: clamp(finite(value?.textStyle?.borderOpacity, 0), 0, 1),
       padding: clamp(finite(value?.textStyle?.padding, 0.2), 0, 2),
       uppercase: Boolean(value?.textStyle?.uppercase),
     },
@@ -295,6 +313,7 @@ function normalizeLevelEvent(value, index, columns, rows) {
       appearance: normalizeAppearance(value?.visual?.appearance),
       spriteAnimation: text(value?.visual?.spriteAnimation, ''),
       animation: normalizeMotionAnimation(value?.visual?.animation),
+      effects: normalizeVisualEffects(value?.visual?.effects),
     },
   };
 }
@@ -357,6 +376,7 @@ export function createLevelDocument(input = {}) {
         water: color(input.theme?.palette?.water, DEFAULT_PALETTE.water),
       },
       ...(themeElements.length ? { elements: themeElements } : {}),
+      edgeEffects: normalizeEdgeEffects(input.theme?.edgeEffects, color(input.theme?.palette?.water, DEFAULT_PALETTE.water)),
     },
     actors: {
       player: {
@@ -365,6 +385,7 @@ export function createLevelDocument(input = {}) {
         renderer: text(input.actors?.player?.renderer, 'franz-lola'),
         animation: text(input.actors?.player?.animation, ''),
         appearance: normalizeAppearance(input.actors?.player?.appearance),
+        effects: normalizeVisualEffects(input.actors?.player?.effects),
         behavior: normalizeBehavior(input.actors?.player?.behavior, 'player'),
       },
       cats: cats.map((cat, index) => ({
@@ -375,6 +396,7 @@ export function createLevelDocument(input = {}) {
         color: color(cat?.color, DEFAULT_CATS[index % DEFAULT_CATS.length].color),
         accent: color(cat?.accent, DEFAULT_CATS[index % DEFAULT_CATS.length].accent),
         appearance: normalizeAppearance(cat?.appearance),
+        effects: normalizeVisualEffects(cat?.effects),
         behavior: normalizeBehavior(cat?.behavior, 'cat', index),
       })),
     },

@@ -3,6 +3,7 @@ import { compileWallGrid, createLevelDocument } from './level-format.js';
 import { drawCat, drawWalker } from './painters/characters.js';
 import { drawCollectibles, drawEasterEggs } from './painters/collectibles.js';
 import { drawDecoration, drawEditorGrid, drawEnvironment } from './painters/environment.js';
+import { drawWithVisualEffects } from './visual-effects.js';
 
 const clampRatio = (value) => Math.min(2, Math.max(1, Number(value) || 1));
 const interpolate = (entity, alpha) => ({ ...entity, x: Number.isFinite(entity.previousX) ? entity.previousX + (entity.x - entity.previousX) * alpha : entity.x, y: Number.isFinite(entity.previousY) ? entity.previousY + (entity.y - entity.previousY) * alpha : entity.y });
@@ -40,8 +41,10 @@ export class PassauPixelRenderer {
     const worldWidth = level.board.columns * level.board.tileSize; const worldHeight = level.board.rows * level.board.tileSize; const scene = this.sceneContext;
     scene.clearRect(0, 0, worldWidth, worldHeight); drawEnvironment(scene, renderLevel, this.grid, elapsed, { language: options.language ?? 'standard', excludeText: true }); drawEasterEggs(scene, renderLevel, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
     drawCollectibles(scene, { pellets: snapshot.pellets, powerUps: snapshot.powerUps }, level.board.tileSize, elapsed);
-    cats.forEach((cat) => drawCat(scene, { ...cat, elapsed }, level.board.tileSize, { frightened: (snapshot.powerTimer ?? 0) > 0, frightenedTime: snapshot.powerTimer ?? 0 }));
-    drawWalker(scene, player, level.board.tileSize, { elapsed, hitTimer: snapshot.hitTimer });
+    cats.forEach((cat) => drawWithVisualEffects(scene, cat.effects, { left: cat.x * level.board.tileSize, top: cat.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
+      () => drawCat(scene, { ...cat, elapsed }, level.board.tileSize, { frightened: (snapshot.powerTimer ?? 0) > 0, frightenedTime: snapshot.powerTimer ?? 0 })));
+    drawWithVisualEffects(scene, player.effects, { left: player.x * level.board.tileSize, top: player.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
+      () => drawWalker(scene, player, level.board.tileSize, { elapsed, hitTimer: snapshot.hitTimer }));
     if (options.editor?.showGrid) drawEditorGrid(scene, level);
     if (options.editor?.cursor) {
       const { x, y, width = 1, height = 1, color = 'rgba(245, 196, 81, 0.5)' } = options.editor.cursor;

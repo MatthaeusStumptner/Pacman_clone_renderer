@@ -1,4 +1,5 @@
 import { drawCat, drawWalker } from './painters/characters.js';
+import { drawWithVisualEffects } from './visual-effects.js';
 
 const PREVIEW_TILE_SIZE = 64;
 
@@ -36,14 +37,13 @@ export function drawActorPreview(context, actor = {}, bounds = {}, options = {})
   context.clip();
   context.translate(left, top);
   context.scale(size / PREVIEW_TILE_SIZE, size / PREVIEW_TILE_SIZE);
-  if (options.kind === 'cat') {
-    drawCat(context, previewActor, PREVIEW_TILE_SIZE, {
+  const draw = () => options.kind === 'cat'
+    ? drawCat(context, previewActor, PREVIEW_TILE_SIZE, {
       frightened: Boolean(options.frightened),
       frightenedTime: Number(options.frightenedTime) || 0,
-    });
-  } else {
-    drawWalker(context, previewActor, PREVIEW_TILE_SIZE, { elapsed, hitTimer: 0 });
-  }
+    })
+    : drawWalker(context, previewActor, PREVIEW_TILE_SIZE, { elapsed, hitTimer: 0 });
+  drawWithVisualEffects(context, previewActor.effects, { left: 0, top: 0, width: PREVIEW_TILE_SIZE, height: PREVIEW_TILE_SIZE }, elapsed, draw);
   context.restore();
   return true;
 }

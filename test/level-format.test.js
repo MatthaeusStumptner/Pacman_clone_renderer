@@ -142,3 +142,34 @@ test('preserves freely positioned and scaled localized text blocks and sprite ev
   assert.equal(normalized.events[0].visual.assetId, 'spark');
   assert.equal(normalized.events[0].visual.appearance.animations[0].keyframes.length, 1);
 });
+
+test('normalizes stackable visual effects, animated level edges and borderless text', () => {
+  const level = valid();
+  level.theme.edgeEffects = [
+    { id: 'Ilz Wellen', type: 'water-flow', side: 'left', speed: 99, intensity: 0.7, count: 4, color: '#2379a3', accent: '#f5c451' },
+    { id: 'boot', type: 'boat', side: 'both', speed: 0.8, intensity: 0.6, count: 1, color: '#d8b27b', accent: '#f3eee0' },
+  ];
+  level.actors.cats[0].effects = [{ id: 'Rock Glitch', type: 'glitch', intensity: 0.8, speed: 3, color: '#ff4f87' }];
+  level.decorations = [{
+    id: 'text', type: 'text', x: 1, y: 1, width: 4, height: 2, color: '#ffffff',
+    content: { standard: 'Nur Text', dialect: 'Bloß Text' },
+    textStyle: { backgroundOpacity: 0, borderOpacity: 0 },
+    effects: [{ id: 'schein', type: 'neon', intensity: 0.5, speed: 1, color: '#55d9dd' }],
+  }];
+  const normalized = createLevelDocument(level);
+  assert.equal(normalized.theme.edgeEffects.length, 2);
+  assert.equal(normalized.theme.edgeEffects[0].id, 'ilz-wellen');
+  assert.equal(normalized.theme.edgeEffects[0].speed, 8);
+  assert.equal(normalized.actors.cats[0].effects[0].type, 'glitch');
+  assert.equal(normalized.decorations[0].effects[0].type, 'neon');
+  assert.equal(normalized.decorations[0].textStyle.backgroundOpacity, 0);
+  assert.equal(normalized.decorations[0].textStyle.borderOpacity, 0);
+});
+
+test('limits visual effect stacks and replaces unsupported effect types', () => {
+  const level = valid();
+  level.actors.player.effects = Array.from({ length: 6 }, (_, index) => ({ id: `fx-${index}`, type: index === 0 ? 'unknown' : 'sparkle' }));
+  const effects = createLevelDocument(level).actors.player.effects;
+  assert.equal(effects.length, 4);
+  assert.equal(effects[0].type, 'glitch');
+});
