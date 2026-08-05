@@ -21,7 +21,7 @@ function drawEcho(context, effect, bounds, elapsed, draw) {
     const phase = elapsed * effect.speed * 3 + index * 0.9;
     context.save();
     context.globalAlpha *= 0.08 + effect.intensity * 0.09;
-    context.filter = `hue-rotate(${Math.round(index * 38)}deg) saturate(1.8)`;
+    context.globalCompositeOperation = 'screen';
     context.translate(Math.cos(phase) * distance * index, Math.sin(phase * 0.7) * distance * index * 0.45);
     draw();
     context.restore();
@@ -37,7 +37,9 @@ function drawGlitch(context, effect, bounds, elapsed, draw) {
     context.save();
     context.beginPath(); context.rect(bounds.left - 4, bounds.top + index * sliceHeight, bounds.width + 8, sliceHeight + 1); context.clip();
     context.globalAlpha *= 0.22 + effect.intensity * 0.24;
-    context.filter = `hue-rotate(${jitter > 0 ? 155 : 305}deg) saturate(2.4)`;
+    context.globalCompositeOperation = 'screen';
+    context.fillStyle = effect.color;
+    context.fillRect(bounds.left - 4, bounds.top + index * sliceHeight, bounds.width + 8, sliceHeight + 1);
     context.translate(Math.round(jitter), 0); draw(); context.restore();
   }
 }
@@ -63,6 +65,20 @@ function drawSparkles(context, effect, bounds, elapsed) {
   context.restore();
 }
 
+function drawNeonHalo(context, effect, bounds, elapsed) {
+  const pulse = 0.7 + (Math.sin(elapsed * effect.speed * 4) * 0.5 + 0.5) * 0.3;
+  const inset = Math.max(1, Math.min(bounds.width, bounds.height) * 0.08);
+  context.save();
+  context.strokeStyle = effect.color;
+  context.globalAlpha *= (0.14 + effect.intensity * 0.2) * pulse;
+  context.lineWidth = Math.max(2, inset * 1.6);
+  context.strokeRect(bounds.left - inset, bounds.top - inset, bounds.width + inset * 2, bounds.height + inset * 2);
+  context.globalAlpha *= 0.55;
+  context.lineWidth = Math.max(1, inset * 0.7);
+  context.strokeRect(bounds.left - inset * 2, bounds.top - inset * 2, bounds.width + inset * 4, bounds.height + inset * 4);
+  context.restore();
+}
+
 export function drawWithVisualEffects(context, value, bounds, elapsed, draw) {
   const effects = normalizeVisualEffects(value);
   if (!effects.length) return draw();
@@ -71,10 +87,10 @@ export function drawWithVisualEffects(context, value, bounds, elapsed, draw) {
   context.save();
   const neon = effects.find((effect) => effect.type === 'neon');
   const hologram = effects.find((effect) => effect.type === 'hologram');
-  if (neon) { context.shadowColor = neon.color; context.shadowBlur = Math.max(2, Math.min(bounds.width, bounds.height) * neon.intensity * 0.42); }
+  if (neon) drawNeonHalo(context, neon, bounds, elapsed);
   if (hologram) {
     context.globalAlpha *= 0.58 + (Math.sin(elapsed * hologram.speed * 8) * 0.5 + 0.5) * 0.3;
-    context.filter = `hue-rotate(${Math.round(elapsed * hologram.speed * 45) % 360}deg) saturate(1.7)`;
+    context.globalCompositeOperation = 'screen';
   }
   const result = draw();
   context.restore();
