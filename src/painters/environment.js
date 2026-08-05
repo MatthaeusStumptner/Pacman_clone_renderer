@@ -26,7 +26,15 @@ function drawStreetTile(context, level, grid, x, y) {
   if (isWall(grid, x + 1, y)) context.fillRect(px + tileSize - 2, py, 2, tileSize);
 }
 
-function drawBuildingTile(context, level, grid, x, y) {
+function wallInstanceAt(level, x, y) {
+  for (let index = level.board.walls.length - 1; index >= 0; index -= 1) {
+    const wall = level.board.walls[index];
+    if (x >= wall.x && x < wall.x + wall.width && y >= wall.y && y < wall.y + wall.height) return wall;
+  }
+  return null;
+}
+
+function drawBuildingTile(context, level, grid, x, y, elapsed = 0) {
   const { tileSize, columns } = level.board;
   const px = x * tileSize;
   const py = y * tileSize;
@@ -39,21 +47,43 @@ function drawBuildingTile(context, level, grid, x, y) {
     context.fillRect(px + ((y * 11 + 5) % 9), py + tileSize * 0.66, tileSize * 0.42, 2);
     return;
   }
-  const tone = palette.walls[(x * 3 + y * 5) % palette.walls.length];
-  context.fillStyle = '#0e2733';
-  context.fillRect(px, py, tileSize, tileSize);
-  context.fillStyle = tone;
-  context.fillRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
-  context.fillStyle = '#48707a';
-  if (!isWall(grid, x, y - 1)) context.fillRect(px + 2, py, tileSize - 4, 3);
-  if (!isWall(grid, x - 1, y)) context.fillRect(px, py + 2, 3, tileSize - 4);
-  if ((x * 13 + y * 7) % 9 === 0) {
-    context.fillStyle = '#d0a94d';
-    context.fillRect(px + tileSize * 0.34, py + tileSize * 0.3, tileSize * 0.3, tileSize * 0.25);
-  } else if ((x + y) % 4 === 0) {
-    context.fillStyle = '#26353d';
-    context.fillRect(px + tileSize * 0.3, py + tileSize * 0.34, tileSize * 0.38, 2);
-  }
+
+  const wall = wallInstanceAt(level, x, y);
+  const pattern = wall?.pattern ?? 'theme';
+  const tone = wall?.useThemeColor === false && wall.color ? wall.color : palette.walls[(x * 3 + y * 5) % palette.walls.length];
+  const accent = wall?.accent ?? '#48707a';
+  const opacity = Number.isFinite(wall?.opacity) ? Math.max(0.15, Math.min(1, wall.opacity)) : 1;
+  const draw = () => {
+    context.save();
+    context.globalAlpha *= opacity;
+    context.fillStyle = '#0e2733';
+    context.fillRect(px, py, tileSize, tileSize);
+    context.fillStyle = tone;
+    context.fillRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
+    context.fillStyle = accent;
+    if (!isWall(grid, x, y - 1)) context.fillRect(px + 2, py, tileSize - 4, 3);
+    if (!isWall(grid, x - 1, y)) context.fillRect(px, py + 2, 3, tileSize - 4);
+
+    if (pattern === 'brick') {
+      for (let row = 6; row < tileSize - 2; row += 6) context.fillRect(px + 2, py + row, tileSize - 4, 1);
+      context.fillRect(px + tileSize / 2, py + 2, 1, 5);
+      context.fillRect(px + tileSize / 3, py + 8, 1, 6);
+      context.fillRect(px + tileSize * 0.68, py + 14, 1, 6);
+    } else if (pattern === 'metal') {
+      context.fillRect(px + tileSize * 0.28, py + 3, 2, tileSize - 6);
+      context.fillRect(px + tileSize * 0.7, py + 3, 1, tileSize - 6);
+    } else if (pattern !== 'solid') {
+      if ((x * 13 + y * 7) % 9 === 0 || pattern === 'windows') {
+        context.fillStyle = wall?.accent ?? '#d0a94d';
+        context.fillRect(px + tileSize * 0.34, py + tileSize * 0.3, tileSize * 0.3, tileSize * 0.25);
+      } else if ((x + y) % 4 === 0) {
+        context.fillStyle = accent;
+        context.fillRect(px + tileSize * 0.3, py + tileSize * 0.34, tileSize * 0.38, 2);
+      }
+    }
+    context.restore();
+  };
+  drawWithVisualEffects(context, wall?.effects, { left: px, top: py, width: tileSize, height: tileSize }, elapsed, draw);
 }
 
 function drawDogPark(context, level, grid) {
@@ -69,10 +99,6 @@ function drawDogPark(context, level, grid) {
     }
   }
   context.globalAlpha = 1;
-  context.fillStyle = '#77a888';
-  context.font = `${Math.max(6, Math.round(tileSize * 0.3))}px monospace`;
-  context.textAlign = 'center';
-  context.fillText('HUNDEWIESE', columns * tileSize / 2, fromY * tileSize + 10);
 }
 
 function drawHome(context, level) {
@@ -91,10 +117,6 @@ function drawHome(context, level) {
   context.fillRect(left + width - 46, top + 43, 18, 15);
   context.fillStyle = '#4a332b';
   context.fillRect(left + width / 2 - 11, top + 58, 22, 36);
-  context.fillStyle = '#f5e7bd';
-  context.font = '7px monospace';
-  context.textAlign = 'center';
-  context.fillText('FRANZ & LOLA', left + width / 2, top + 37);
 }
 
 function drawBschuett(context, level) {
@@ -115,10 +137,6 @@ function drawBschuett(context, level) {
   context.fillStyle = '#718184';
   context.fillRect(left + 10, top + 24, 24, 5);
   context.fillRect(left + width - 38, top + height - 29, 24, 5);
-  context.fillStyle = '#8fcfa8';
-  context.font = '7px monospace';
-  context.textAlign = 'center';
-  context.fillText('BSCHÜTT · SKATE & SPIEL', left + width / 2, top - 7);
 }
 
 function drawFactory(context, level) {
@@ -138,10 +156,6 @@ function drawFactory(context, level) {
   context.fillRect(left + width - 39, top - 2, 13, 20);
   context.fillStyle = '#e2a750';
   for (const x of [left + 24, left + 58, left + width - 70, left + width - 36]) context.fillRect(x, top + 38, 14, 12);
-  context.fillStyle = '#f0d0a0';
-  context.font = '7px monospace';
-  context.textAlign = 'center';
-  context.fillText('TABAKFABRIK', left + width / 2, top + 31);
 }
 
 function themeElementAnimation(level, id, fallback) {
@@ -169,17 +183,6 @@ function drawStage(context, level, elapsed) {
   context.fillStyle = '#9d4778';
   [left + 23, left + width - 35].forEach((speakerX) => { context.fillRect(speakerX, top + 54, 12, 12); context.fillRect(speakerX, top + 79, 12, 12); });
   context.fillStyle = '#17101c'; context.fillRect(left + 54, top + height - 35, 31, 25); context.fillRect(left + width - 85, top + height - 35, 31, 25);
-  context.fillStyle = '#ff5d93';
-  context.font = '8px monospace';
-  context.textAlign = 'center';
-  context.fillText('⚡ ZAUBERBERG ⚡', left + width / 2, top + 34);
-  context.fillStyle = '#f1e0b7';
-  context.font = '7px monospace';
-  context.fillText('ROCK · PUNK · METAL', left + width / 2, top + 49);
-  context.save(); applyMotionAnimation(context, themeElementAnimation(level, 'stage-note', { type: 'bob', speed: 1.1, amplitude: 0.125 }), elapsed, left + width / 2, top + 79, tileSize);
-  context.fillStyle = '#63d9d4';
-  zauberbergNoteRectangles(left, top, width, 0).forEach(([x, y, noteWidth, noteHeight]) => context.fillRect(x, y, noteWidth, noteHeight));
-  context.restore();
 }
 
 export function zauberbergSpotlightPolygons(left, top, width, height) {
@@ -189,21 +192,13 @@ export function zauberbergSpotlightPolygons(left, top, width, height) {
   ];
 }
 
-export function zauberbergNoteRectangles(left, top, width, bounce = 0) {
-  return [
-    [left + width / 2 - 2, top + 68 + bounce, 4, 21],
-    [left + width / 2 + 2, top + 68 + bounce, 11, 4],
-    [left + width / 2 + 9, top + 71 + bounce, 4, 7],
-  ];
-}
-
 export function drawEnvironment(context, level, grid, elapsed = 0, options = {}) {
   const { columns, rows, tileSize } = level.board;
   context.fillStyle = '#0b1620';
   context.fillRect(0, 0, columns * tileSize, rows * tileSize);
   for (let y = 0; y < rows; y += 1) {
     for (let x = 0; x < columns; x += 1) {
-      if (grid[y][x]) drawBuildingTile(context, level, grid, x, y);
+      if (grid[y][x]) drawBuildingTile(context, level, grid, x, y, elapsed);
       else drawStreetTile(context, level, grid, x, y);
     }
   }

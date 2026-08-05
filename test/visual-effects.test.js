@@ -29,7 +29,8 @@ test('stacks every visual effect without GPU-only filters or full-canvas blur', 
   drawWithVisualEffects(context, effects, { left: 10, top: 12, width: 32, height: 32 }, 1.5, () => { draws += 1; });
   assert.ok(draws > 4, 'stacked effects redraw clipped actor slices and echoes');
   assert.ok(context.operations.includes('composite:screen'));
-  assert.ok(context.operations.includes('stroke'));
+  assert.equal(context.operations.includes('stroke'), false, 'object effects no longer draw rectangular or scanline bars');
+  assert.equal(context.operations.includes('fill'), false, 'glitch and hologram effects only redraw clipped sprite pixels');
   assert.equal(context.operations.some((entry) => entry.startsWith('filter:')), false);
   assert.equal(context.operations.some((entry) => entry.startsWith('shadowBlur:')), false);
 });
@@ -50,4 +51,16 @@ test('draws every animated level-edge type with deterministic Canvas2D primitive
   drawLevelEdgeEffects(context, level, 2.25);
   assert.ok(context.operations.filter((entry) => entry === 'fill').length > 20);
   assert.ok(context.operations.includes('line'));
+});
+
+test('suppresses every overlay when the wrapped actor is hidden during respawn', () => {
+  const context = recordingContext();
+  let draws = 0;
+  const result = drawWithVisualEffects(context, [
+    { id: 'glitch', type: 'glitch', intensity: 1, speed: 3, color: '#ff4f87' },
+    { id: 'sparkle', type: 'sparkle', intensity: 1, speed: 3, color: '#f5c451' },
+  ], { left: 10, top: 10, width: 24, height: 24 }, 0.5, () => { draws += 1; return false; });
+  assert.equal(result, false);
+  assert.equal(draws, 1);
+  assert.equal(context.operations.includes('fill'), false);
 });

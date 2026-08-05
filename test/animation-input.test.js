@@ -54,12 +54,12 @@ test('queued navigation reverses immediately but buffers perpendicular turns wit
   assert.equal(actor.x, 4.37);
 });
 
-test('Zauberberg exposes its animated note and stage lights as editable theme elements', () => {
-  const level = createLevelDocument({ theme: { landmark: 'zauberberg', elements: [{ id: 'stage-note', animation: { type: 'spin', speed: 2.5, amplitude: 0.4 } }] }, actors: { cats: [] } });
-  assert.equal(level.theme.elements[0].id, 'stage-note');
-  assert.deepEqual({ type: level.theme.elements[0].animation.type, speed: level.theme.elements[0].animation.speed, amplitude: level.theme.elements[0].animation.amplitude }, { type: 'spin', speed: 2.5, amplitude: 0.4 });
-  assert.equal(level.theme.elements[1].id, 'stage-lights');
-  assert.deepEqual(level.theme.elements[0].animation.keyframes, []);
+test('Zauberberg keeps stage lights as system scenery while legacy note metadata remains readable', () => {
+  const clean = createLevelDocument({ theme: { landmark: 'zauberberg', elements: [] }, actors: { cats: [] } });
+  assert.deepEqual(clean.theme.elements.map((element) => element.id), ['stage-lights']);
+  const legacy = createLevelDocument({ theme: { landmark: 'zauberberg', elements: [{ id: 'stage-note', animation: { type: 'spin', speed: 2.5, amplitude: 0.4 } }] }, actors: { cats: [] } });
+  const note = legacy.theme.elements.find((element) => element.id === 'stage-note');
+  assert.deepEqual({ type: note.animation.type, speed: note.animation.speed, amplitude: note.animation.amplitude }, { type: 'spin', speed: 2.5, amplitude: 0.4 });
 });
 
 test('samples authored motion keyframes with playback duration, looping and easing', () => {

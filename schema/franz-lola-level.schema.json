@@ -109,7 +109,7 @@
     "rectangle": {
       "allOf": [
         { "$ref": "#/$defs/point" },
-        { "type": "object", "required": ["width", "height"], "properties": { "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 } } }
+        { "type": "object", "required": ["width", "height"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "useThemeColor": { "type": "boolean" }, "pattern": { "enum": ["theme", "solid", "brick", "metal", "windows"] }, "opacity": { "type": "number", "minimum": 0.15, "maximum": 1 }, "effects": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/visualEffect" } } } }
       ]
     },
     "appearance": {

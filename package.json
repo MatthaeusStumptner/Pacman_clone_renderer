@@ -1,6 +1,6 @@
 {
   "name": "@franz-lola/pixel-renderer",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Shared pixel-art renderer and level format for Franz & Lola games and tools.",
   "type": "module",
   "private": false,

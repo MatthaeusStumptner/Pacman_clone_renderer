@@ -17,7 +17,7 @@ Ein Level ist reines JSON mit `kind: "franz-lola-level"` und `schemaVersion: 1`.
 
 - lokalisierte Namen, Missionen und Beschreibungen
 - Passau-Koordinaten und Gebietsangaben
-- freie Rastergröße, Tunnelzeilen und rechteckige Wandsegmente
+- freie Rastergröße, Tunnelzeilen und einzeln adressierbare Wandsegmente mit eigener Farbe, Muster, Deckkraft und Effektstapel
 - Landmarken und vollständige Farbpaletten
 - Franz & Lola, beliebig viele Katzen und Power-ups mit stabilen, eindeutigen Actor-IDs
 - optionale Pixel-Sprites mit Palette, benannten Animationen und zeitbasierten Keyframes samt Dauer, Easing, Playback und Loop-Modus; das ältere FPS-/Frame-Format bleibt lesbar
@@ -43,7 +43,7 @@ Das maschinenlesbare Schema liegt unter `schema/franz-lola-level.schema.json` un
 
 `DirectionalSwipeInput` und `queuePlayerDirection()` bilden außerdem den gemeinsamen Eingabevertrag für Spiel und Editor-Testlauf: Wischen reagiert während der Geste, Gegenrichtungen kehren sofort um und Abzweigungen werden bis zum nächsten gültigen Rasterzentrum gepuffert, ohne die Figur zu versetzen.
 
-Umgebungsdetails sind Teil desselben Renderers. Dazu gehören auch die animierte Zauberberg-Bühne mit zwei transparenten Lichtkegeln, Verstärkern, Lautsprechern und Musiknote sowie die Ereignissymbole und optional eingeblendeten Triggerzonen des Editors.
+Umgebungsdetails sind Teil desselben Renderers. Die animierte Zauberberg-Bühne enthält nur noch die bauliche Kulisse und zwei transparente Lichtkegel. Beschriftungen und Musiknoten sind normale, frei verschiebbare und löschbare Levelobjekte; dasselbe gilt für Ereignissymbole und die optional eingeblendeten Triggerzonen des Editors.
 
 Textblöcke werden mit Pretext Unicode-sicher vorbereitet und vermessen. Ihre Glyphen entstehen nach der Pixelwelt direkt in der endgültigen Kameraauflösung; dadurch bleiben sie auch bei Retina-Displays, Kamerazoom und gebrochenen Objektkoordinaten scharf, ohne die Pixelgrafik weichzuzeichnen.
 

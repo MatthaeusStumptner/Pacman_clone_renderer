@@ -45,7 +45,7 @@ export function drawWalker(context, player, tileSize, { elapsed = 0, hitTimer = 
 }
 
 export function drawCat(context, cat, tileSize, { frightened = false, frightenedTime = 0 } = {}) {
-  if (cat.respawnTimer > 0 && Math.floor(cat.respawnTimer * 8) % 2 === 0) return;
+  if (cat.respawnTimer > 0) return false;
   const elapsed = Number(cat.elapsed) || 0;
   if (frightened && animationById(cat.appearance, 'frightened') && drawActorAppearance(context, cat, tileSize, { animationId: 'frightened', state: 'idle', elapsed })) return;
   const catDirection = directionOf(cat.dir);
@@ -59,4 +59,5 @@ export function drawCat(context, cat, tileSize, { frightened = false, frightened
   context.fillStyle = '#f5f0d9'; context.fillRect(px - 5, py - 3, 4, 4); context.fillRect(px + 2, py - 3, 4, 4);
   context.fillStyle = frightened ? '#f5f0d9' : '#17212a'; context.fillRect(px - 3, py - 2, 2, 2); context.fillRect(px + 3, py - 2, 2, 2);
   context.fillStyle = body; context.fillRect(px + 7, py + 1, 3, 7); context.fillRect(px + 8, py - 1, 5, 3);
+  return true;
 }
