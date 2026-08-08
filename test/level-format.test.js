@@ -36,6 +36,29 @@ test('preserves an intentionally empty cat list', () => {
   assert.deepEqual(createLevelDocument(level).actors.cats, []);
 });
 
+test('keeps reusable custom characters separate from enemy cats and exposes them to cutscenes', () => {
+  const level = valid();
+  level.actors.characters = [{
+    id: 'passau-postler', characterId: 'postler', name: 'Passauer Postler', x: 2, y: 5, state: 'left',
+    appearance: { width: 4, height: 4, palette: ['transparent', '#55d9dd'], pixels: ['0110', '1111', '0110', '1001'] },
+    behavior: { controller: 'patrol', speedMultiplier: 0.75 },
+  }];
+  level.cutscenes = [{
+    id: 'begruessung', kind: 'intro', name: { standard: 'Begrüßung', dialect: 'Servus' }, duration: 2,
+    tracks: [{ id: 'postler-spur', type: 'actor', target: 'character:passau-postler', keyframes: [{ time: 0, x: 2, y: 5, state: 'left' }, { time: 2, x: 5, y: 5, state: 'right' }] }],
+  }];
+
+  const normalized = createLevelDocument(level);
+  assert.equal(normalized.actors.cats.length, 1);
+  assert.equal(normalized.actors.characters[0].characterId, 'postler');
+  assert.equal(normalized.actors.characters[0].name, 'Passauer Postler');
+  assert.equal(normalized.actors.characters[0].behavior.controller, 'patrol');
+  const sample = sampleCutscene(normalized, normalized.cutscenes[0], 1);
+  assert.equal(sample.characters.length, 1);
+  assert.equal(sample.characters[0].x, 3.5);
+  assert.equal(sample.characters[0].direction.name, 'right');
+});
+
 test('assigns stable unique actor ids and preserves authored cat ids', () => {
   const level = valid();
   level.actors.player.id = 'franz-lola';

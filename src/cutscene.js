@@ -59,7 +59,9 @@ export function sampleCutscene(levelInput, cutsceneInput, elapsed = 0, language 
     }
     const actor = track.target === 'player'
       ? level.actors.player
-      : level.actors.cats.find((cat, index) => track.target === `cat:${cat.id ?? index}` || track.target === `cat:${index}`);
+      : track.target.startsWith('character:')
+        ? level.actors.characters.find((character, index) => track.target === `character:${character.id ?? index}` || track.target === `character:${index}`)
+        : level.actors.cats.find((cat, index) => track.target === `cat:${cat.id ?? index}` || track.target === `cat:${index}`);
     if (!actor) return;
     actor.x = sampled.x; actor.y = sampled.y; actor.animation = sampled.animation || actor.animation;
     actor.direction = { name: sampled.state, x: sampled.state === 'left' ? -1 : sampled.state === 'right' ? 1 : 0, y: sampled.state === 'up' ? -1 : sampled.state === 'down' ? 1 : 0 };
@@ -67,10 +69,12 @@ export function sampleCutscene(levelInput, cutsceneInput, elapsed = 0, language 
   });
   level.decorations = level.decorations.filter((item) => !hiddenObjects.has(item.id));
   level.actors.cats = level.actors.cats.filter((cat) => !cat.hidden);
+  level.actors.characters = level.actors.characters.filter((character) => !character.hidden);
   return {
     level,
     player: level.actors.player,
     cats: level.actors.cats,
+    characters: level.actors.characters,
     decorations: level.decorations,
     time,
     duration: cutscene.duration,

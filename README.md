@@ -2,6 +2,8 @@
 
 Gemeinsamer, frameworkfreier Canvas-Renderer und Simulationskern für Spiel und Levelwerkstatt. Das Paket enthält das versionierte Zwischenformat, Normalisierung, Validierung, Wegerreichbarkeit, Kamera-Projektion, Pixel-Art-Painter und die bildfrequenzunabhängige Maze-Chase-Simulation.
 
+Eigene, nicht feindliche Figuren leben getrennt von Katzen unter `actors.characters`. Sie besitzen stabile IDs, eine wiederverwendbare `characterId`, Namen, Player States, Sprite-Animationen, Effekte und Cutscene-Ziele wie `character:passauer-postler`. Der Renderer zeichnet sie in normalen Levels und in gesampelten Cutscenes, ohne sie als Gegner oder Schwierigkeitsfaktor zu zählen.
+
 ```js
 import { PassauPixelRenderer, parseLevelDocument } from '@franz-lola/pixel-renderer';
 
