@@ -42,7 +42,7 @@ function normalizeObject(input, id, name) {
     collectibles: { powerUps: [] },
     decorations: [{ ...clone(input), id, assetId: id, name, x: 1, y: 1 }],
   }).decorations[0];
-  const { x: _x, y: _y, assetId: _assetId, layer: _layer, locked: _locked, ...portable } = object;
+  const { x: _x, y: _y, assetId: _assetId, assetOverrides: _assetOverrides, layer: _layer, locked: _locked, ...portable } = object;
   return {
     ...portable,
     id,

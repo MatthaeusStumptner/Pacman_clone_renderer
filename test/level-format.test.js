@@ -150,6 +150,16 @@ test('preserves reusable sprite objects and samples level-bound cutscenes', () =
   assert.equal(sample.done, false);
 });
 
+test('preserves only supported linked object overrides', () => {
+  const level = createLevelDocument({
+    decorations: [{
+      id: 'note-1', assetId: 'music-note', type: 'custom', color: '#ff00aa',
+      assetOverrides: ['color', 'label', 'color', 'unknown'],
+    }],
+  });
+  assert.deepEqual(level.decorations[0].assetOverrides, ['color', 'label']);
+});
+
 test('preserves freely positioned and scaled localized text blocks and sprite event visuals', () => {
   const level = valid();
   const appearance = { width: 4, height: 4, palette: ['transparent', '#ffffff'], pixels: rows('1'), animations: [{ id: 'idle', duration: 1, keyframes: [{ id: 'keyframe-1', time: 0, pixels: rows('1') }] }] };
