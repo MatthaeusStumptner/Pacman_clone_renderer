@@ -10,6 +10,16 @@ export {
 } from './level-format.js';
 
 export {
+  CONTENT_DOCUMENT_KIND,
+  CONTENT_SCHEMA_VERSION,
+  CONTENT_TYPES,
+  createContentDocument,
+  validateContentDocument,
+  parseContentDocument,
+  contentPublicationPath,
+} from './content-document.js';
+
+export {
   calculateCamera,
   projectWorldPoint,
   visibleWorldBounds,
