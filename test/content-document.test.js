@@ -42,3 +42,11 @@ test('rejects malformed wrappers before normalization', () => {
   assert.equal(validateContentDocument({ ...value, id: '../escape' }).ok, false);
   assert.throws(() => parseContentDocument('{nope'), /gültiges JSON/);
 });
+
+test('does not leak level instance overrides into reusable object definitions', () => {
+  const value = createContentDocument('object', {
+    ...samples.object,
+    assetOverrides: ['color', 'appearance'],
+  });
+  assert.equal('assetOverrides' in value.document, false);
+});

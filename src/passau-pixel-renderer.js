@@ -64,6 +64,7 @@ export class PassauPixelRenderer {
     const cameraTarget = options.cameraTarget ?? { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 };
     const camera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
     this.present(camera); this.presentText(renderLevel, camera, elapsed, options.language ?? 'standard');
+    if (options.editor?.selections?.length) this.presentEditorSelections(options.editor.selections, camera, level.board.tileSize, elapsed);
     if (options.editor?.transformSelection) this.presentTransformSelection(options.editor.transformSelection, camera, level.board.tileSize);
     const tile = level.board.tileSize; const playerScreen = projectWorldPoint(camera, { x: player.x * tile + tile / 2, y: player.y * tile + tile / 2 }); const bounds = visibleWorldBounds(camera);
     const entities = cats.map((cat, index) => { const world = { x: cat.x * tile + tile / 2, y: cat.y * tile + tile / 2 }; return { id: cat.id ?? `cat-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - cat.x, player.y - cat.y), color: cat.color, respawnTimer: cat.respawnTimer ?? 0 }; });
@@ -130,6 +131,29 @@ export class PassauPixelRenderer {
     [[left, top], [left + width, top], [left + width, top + height], [left, top + height]].forEach(([x, y]) => {
       context.fillStyle = '#071016'; context.fillRect(x - handle / 2, y - handle / 2, handle, handle);
       context.strokeStyle = '#55d9dd'; context.lineWidth = Math.max(2, ratio); context.strokeRect(x - handle / 2, y - handle / 2, handle, handle);
+    });
+    context.restore();
+  }
+
+  presentEditorSelections(selections, camera, tile, elapsed = 0) {
+    const ratio = this.pixelRatio; const context = this.context;
+    const project = (x, y) => ({
+      x: (camera.viewport.x + (x * tile - camera.source.x) / camera.source.width * camera.viewport.width) * ratio,
+      y: (camera.viewport.y + (y * tile - camera.source.y) / camera.source.height * camera.viewport.height) * ratio,
+    });
+    context.save();
+    selections.forEach((selection, index) => {
+      const start = project(selection.x, selection.y); const end = project(selection.x + (selection.width ?? 1), selection.y + (selection.height ?? 1));
+      const inset = Math.max(2, ratio * 1.5); const left = Math.round(start.x) + inset; const top = Math.round(start.y) + inset;
+      const width = Math.max(4, Math.round(end.x - start.x) - inset * 2); const height = Math.max(4, Math.round(end.y - start.y) - inset * 2);
+      const primary = selection.primary !== false && index === selections.length - 1;
+      context.strokeStyle = primary ? '#f5c451' : '#55d9dd';
+      context.lineWidth = Math.max(primary ? 3 : 2, ratio * (primary ? 2 : 1.4));
+      context.globalAlpha = primary ? 0.82 + Math.sin(elapsed * 5) * 0.14 : 0.78;
+      context.shadowColor = context.strokeStyle; context.shadowBlur = primary ? 8 * ratio : 3 * ratio;
+      context.setLineDash(primary ? [] : [5 * ratio, 3 * ratio]);
+      context.strokeRect(left, top, width, height);
+      context.setLineDash([]); context.shadowBlur = 0; context.globalAlpha = 1;
     });
     context.restore();
   }

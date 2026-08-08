@@ -169,10 +169,13 @@ function normalizeEdgeEffects(value, fallbackColor) {
 
 function normalizeDecoration(value, index, columns, rows) {
   const allowedTypes = ['tree', 'bench', 'lamp', 'flower', 'sign', 'rock', 'water', 'custom', 'text'];
+  const allowedAssetOverrides = ['name', 'type', 'width', 'height', 'color', 'label', 'appearance', 'spriteAnimation', 'animation', 'effects', 'content', 'textStyle'];
   const type = allowedTypes.includes(value?.type) ? value.type : 'custom';
   return {
     id: text(value?.id, `decoration-${index + 1}`),
     assetId: slug(value?.assetId, type),
+    assetOverrides: [...new Set(Array.isArray(value?.assetOverrides) ? value.assetOverrides : [])]
+      .filter((entry) => allowedAssetOverrides.includes(entry)),
     name: text(value?.name, text(value?.label, `Objekt ${index + 1}`)),
     type,
     x: clamp(finite(value?.x, 1), 0, columns - 0.25),
