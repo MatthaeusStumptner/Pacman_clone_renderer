@@ -57,7 +57,8 @@
       "required": ["player", "cats"],
       "properties": {
         "player": { "$ref": "#/$defs/actor" },
-        "cats": { "type": "array", "items": { "$ref": "#/$defs/actor" } }
+        "cats": { "type": "array", "items": { "$ref": "#/$defs/actor" } },
+        "characters": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/actor" } }
       }
     },
     "collectibles": {
@@ -218,7 +219,7 @@
     "actor": {
       "allOf": [
         { "$ref": "#/$defs/point" },
-        { "type": "object", "properties": { "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "renderer": { "type": "string" }, "animation": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" }, "effects": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/visualEffect" } }, "behavior": { "$ref": "#/$defs/actorBehavior" } } }
+        { "type": "object", "properties": { "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "characterId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "name": { "type": "string" }, "renderer": { "type": "string" }, "state": { "enum": ["idle", "up", "right", "down", "left"] }, "animation": { "type": "string" }, "color": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" }, "appearance": { "$ref": "#/$defs/appearance" }, "effects": { "type": "array", "maxItems": 4, "items": { "$ref": "#/$defs/visualEffect" } }, "behavior": { "$ref": "#/$defs/actorBehavior" } } }
       ]
     },
     "motionAnimation": {

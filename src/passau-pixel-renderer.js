@@ -37,6 +37,7 @@ export class PassauPixelRenderer {
     const alpha = Math.min(1, Math.max(0, Number(options.alpha) || 0));
     const player = interpolate({ ...level.actors.player, ...(snapshot.player ?? {}) }, alpha);
     const cats = (snapshot.cats ?? level.actors.cats).map((cat, index) => interpolate({ ...(level.actors.cats[index] ?? {}), ...cat }, alpha)); const elapsed = Number(snapshot.elapsed) || 0;
+    const characters = (snapshot.characters ?? level.actors.characters ?? []).map((character, index) => interpolate({ ...(level.actors.characters?.[index] ?? {}), ...character }, alpha));
     const renderLevel = snapshot.decorations ? { ...level, decorations: snapshot.decorations } : level;
     const worldWidth = level.board.columns * level.board.tileSize; const worldHeight = level.board.rows * level.board.tileSize; const scene = this.sceneContext;
     scene.clearRect(0, 0, worldWidth, worldHeight); drawEnvironment(scene, renderLevel, this.grid, elapsed, { language: options.language ?? 'standard', excludeText: true }); drawEasterEggs(scene, renderLevel, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
@@ -45,6 +46,10 @@ export class PassauPixelRenderer {
       if ((cat.respawnTimer ?? 0) > 0) return;
       drawWithVisualEffects(scene, cat.effects, { left: cat.x * level.board.tileSize, top: cat.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
         () => drawCat(scene, { ...cat, elapsed }, level.board.tileSize, { frightened: (snapshot.powerTimer ?? 0) > 0, frightenedTime: snapshot.powerTimer ?? 0 }));
+    });
+    characters.forEach((character) => {
+      drawWithVisualEffects(scene, character.effects, { left: character.x * level.board.tileSize, top: character.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
+        () => drawWalker(scene, { ...character, direction: character.state, elapsed }, level.board.tileSize, { elapsed, hitTimer: 0 }));
     });
     drawWithVisualEffects(scene, player.effects, { left: player.x * level.board.tileSize, top: player.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
       () => drawWalker(scene, player, level.board.tileSize, { elapsed, hitTimer: snapshot.hitTimer }));
@@ -62,7 +67,8 @@ export class PassauPixelRenderer {
     if (options.editor?.transformSelection) this.presentTransformSelection(options.editor.transformSelection, camera, level.board.tileSize);
     const tile = level.board.tileSize; const playerScreen = projectWorldPoint(camera, { x: player.x * tile + tile / 2, y: player.y * tile + tile / 2 }); const bounds = visibleWorldBounds(camera);
     const entities = cats.map((cat, index) => { const world = { x: cat.x * tile + tile / 2, y: cat.y * tile + tile / 2 }; return { id: cat.id ?? `cat-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - cat.x, player.y - cat.y), color: cat.color, respawnTimer: cat.respawnTimer ?? 0 }; });
-    return { camera, playerScreen, entities, display };
+    const characterEntities = characters.map((character, index) => { const world = { x: character.x * tile + tile / 2, y: character.y * tile + tile / 2 }; return { id: character.id ?? `character-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - character.x, player.y - character.y), color: character.color }; });
+    return { camera, playerScreen, entities, characterEntities, display };
   }
 
   setLevelIfChanged(levelInput) {

@@ -48,6 +48,13 @@ function normalizeBehavior(value, kind, index = 0) {
       speedMultiplier: clamp(finite(input.speedMultiplier, 1), 0.1, 4),
     };
   }
+  if (kind === 'character') {
+    const controllers = ['stationary', 'patrol'];
+    return {
+      controller: controllers.includes(input.controller) ? input.controller : 'stationary',
+      speedMultiplier: clamp(finite(input.speedMultiplier, 1), 0.1, 4),
+    };
+  }
   const strategies = ['chase', 'ambush', 'scatter-chase', 'scatter', 'guard', 'random', 'stationary'];
   const fallbackStrategy = index === 1 ? 'ambush' : index === 2 ? 'scatter-chase' : 'chase';
   return {
@@ -324,6 +331,7 @@ export function createLevelDocument(input = {}) {
   const defaultPlayer = { x: Math.floor(columns / 2), y: Math.max(1, rows - 5) };
   const walls = Array.isArray(input.board?.walls) ? input.board.walls : [];
   const cats = Array.isArray(input.actors?.cats) ? input.actors.cats : DEFAULT_CATS;
+  const characters = Array.isArray(input.actors?.characters) ? input.actors.characters : [];
   const powerUps = Array.isArray(input.collectibles?.powerUps)
     ? input.collectibles.powerUps
     : [{ x: 1, y: 1 }, { x: columns - 2, y: 1 }, { x: 1, y: rows - 2 }, { x: columns - 2, y: rows - 2 }];
@@ -333,6 +341,14 @@ export function createLevelDocument(input = {}) {
     let id = base; let suffix = 2;
     while (usedCatIds.has(id)) { id = `${base}-${suffix}`; suffix += 1; }
     usedCatIds.add(id);
+    return id;
+  };
+  const usedCharacterIds = new Set();
+  const uniqueCharacterId = (value, index) => {
+    const base = slug(value, `character-${index + 1}`);
+    let id = base; let suffix = 2;
+    while (usedCharacterIds.has(id)) { id = `${base}-${suffix}`; suffix += 1; }
+    usedCharacterIds.add(id);
     return id;
   };
   const landmark = text(input.theme?.landmark, 'dog-park');
@@ -409,6 +425,20 @@ export function createLevelDocument(input = {}) {
         appearance: normalizeAppearance(cat?.appearance),
         effects: normalizeVisualEffects(cat?.effects),
         behavior: normalizeBehavior(cat?.behavior, 'cat', index),
+      })),
+      characters: characters.slice(0, 64).map((character, index) => ({
+        id: uniqueCharacterId(character?.id, index),
+        characterId: slug(character?.characterId, `character-${index + 1}`),
+        name: text(character?.name, `Figur ${index + 1}`).trim() || `Figur ${index + 1}`,
+        ...normalizePoint(character, defaultPlayer),
+        renderer: text(character?.renderer, 'pixel-art'),
+        state: ['idle', 'up', 'right', 'down', 'left'].includes(character?.state) ? character.state : 'idle',
+        animation: text(character?.animation, ''),
+        color: color(character?.color, '#55d9dd'),
+        accent: color(character?.accent, '#f5c451'),
+        appearance: normalizeAppearance(character?.appearance),
+        effects: normalizeVisualEffects(character?.effects),
+        behavior: normalizeBehavior(character?.behavior, 'character', index),
       })),
     },
     collectibles: {
@@ -499,11 +529,14 @@ export function validateLevelDocument(input) {
   if (Number(input?.schemaVersion) !== LEVEL_FORMAT_VERSION) errors.push(`schemaVersion muss ${LEVEL_FORMAT_VERSION} sein.`);
   if (!/^[a-z0-9][a-z0-9-]*$/.test(level.id)) errors.push('id darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.');
   const grid = compileWallGrid(level);
-  const { player, cats } = level.actors;
+  const { player, cats, characters } = level.actors;
   const inside = (point) => point.x >= 0 && point.x < level.board.columns && point.y >= 0 && point.y < level.board.rows;
   if (!inside(player) || grid[player.y]?.[player.x]) errors.push('Der Startpunkt von Franz und Lola liegt außerhalb oder in einer Wand.');
   cats.forEach((cat, index) => {
     if (!inside(cat) || grid[cat.y]?.[cat.x]) errors.push(`Katze ${index + 1} liegt außerhalb oder in einer Wand.`);
+  });
+  characters.forEach((character, index) => {
+    if (!inside(character) || grid[character.y]?.[character.x]) errors.push(`Figur ${character.name || index + 1} liegt außerhalb oder in einer Wand.`);
   });
   const reachable = reachableTileKeys(level);
   if (reachable.size === 0) errors.push('Vom Startpunkt ist keine begehbare Fläche erreichbar.');
