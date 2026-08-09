@@ -26,6 +26,8 @@ export {
 } from './camera.js';
 
 export { PassauPixelRenderer } from './passau-pixel-renderer.js';
+export { EFFECT_MODES, resolvePostProcessProfile, resolveRendererQuality, rendererPixelRatioLimit } from './gpu/effect-profile.js';
+export { RENDER_BUDGETS, evaluatePerformanceBudget, summarizeRenderSamples } from './performance.js';
 export { cutsceneById, sampleCutscene } from './cutscene.js';
 export { drawPixelSprite } from './painters/sprites.js';
 export { drawActorPreview } from './actor-preview.js';
