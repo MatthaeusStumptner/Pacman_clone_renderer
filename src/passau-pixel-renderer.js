@@ -4,30 +4,43 @@ import { drawCat, drawWalker } from './painters/characters.js';
 import { drawCollectibles, drawEasterEggs } from './painters/collectibles.js';
 import { drawDecoration, drawEditorGrid, drawEnvironment } from './painters/environment.js';
 import { drawWithVisualEffects } from './visual-effects.js';
+import { resolvePostProcessProfile, resolveRendererQuality, rendererPixelRatioLimit } from './gpu/effect-profile.js';
+import { createPresentationBackend, createSyncPresentationBackend } from './gpu/presentation-backend.js';
 
-const clampRatio = (value) => Math.min(2, Math.max(1, Number(value) || 1));
+const clampRatio = (value, maximum = 2) => Math.min(maximum, Math.max(1, Number(value) || 1));
 const interpolate = (entity, alpha) => ({ ...entity, x: Number.isFinite(entity.previousX) ? entity.previousX + (entity.x - entity.previousX) * alpha : entity.x, y: Number.isFinite(entity.previousY) ? entity.previousY + (entity.y - entity.previousY) * alpha : entity.y });
 
 export class PassauPixelRenderer {
-  constructor(canvas, { pixelRatio, zoom = 1.12 } = {}) {
+  static async create(canvas, options = {}) {
+    const presentationBackend = await createPresentationBackend(canvas, options);
+    return new PassauPixelRenderer(canvas, { ...options, presentationBackend });
+  }
+
+  constructor(canvas, { pixelRatio, zoom = 1.12, presentationBackend, quality = 'auto', ...backendOptions } = {}) {
     if (!canvas?.getContext) throw new TypeError('PassauPixelRenderer benötigt ein Canvas-Element.');
-    this.canvas = canvas; this.context = canvas.getContext('2d'); this.document = canvas.ownerDocument ?? globalThis.document;
+    this.canvas = canvas; this.document = canvas.ownerDocument ?? globalThis.document;
+    this.quality = resolveRendererQuality(quality); this.pixelRatioLimit = rendererPixelRatioLimit(this.quality);
+    this.sceneScale = this.quality === 'performance' ? 1 : this.quality === 'balanced' ? 1.5 : 2;
+    this.presentation = presentationBackend ?? createSyncPresentationBackend(canvas, { ...backendOptions, quality });
     this.scene = this.document.createElement('canvas'); this.sceneContext = this.scene.getContext('2d');
-    this.pixelRatio = clampRatio(pixelRatio ?? globalThis.devicePixelRatio); this.zoom = zoom; this.level = null; this.grid = null;
+    this.overlay = this.document.createElement('canvas'); this.overlayContext = this.overlay.getContext('2d');
+    this.context = this.overlayContext;
+    this.pixelRatio = clampRatio(pixelRatio ?? globalThis.devicePixelRatio, this.pixelRatioLimit); this.zoom = zoom; this.level = null; this.grid = null;
   }
 
   setLevel(levelInput) {
     this.levelInput = levelInput;
     this.level = createLevelDocument(levelInput); this.grid = compileWallGrid(this.level);
     const width = this.level.board.columns * this.level.board.tileSize; const height = this.level.board.rows * this.level.board.tileSize;
-    this.scene.width = width * 2; this.scene.height = height * 2; this.sceneContext.setTransform(2, 0, 0, 2, 0, 0); this.sceneContext.imageSmoothingEnabled = false;
+    this.scene.width = Math.round(width * this.sceneScale); this.scene.height = Math.round(height * this.sceneScale); this.sceneContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.sceneContext.imageSmoothingEnabled = false;
     return this.level;
   }
 
   resize() {
-    const bounds = this.canvas.getBoundingClientRect(); const ratio = clampRatio(globalThis.devicePixelRatio ?? this.pixelRatio);
+    const bounds = this.canvas.getBoundingClientRect(); const ratio = clampRatio(globalThis.devicePixelRatio ?? this.pixelRatio, this.pixelRatioLimit);
     const width = Math.max(1, Math.round((bounds.width || this.canvas.clientWidth || 1) * ratio)); const height = Math.max(1, Math.round((bounds.height || this.canvas.clientHeight || 1) * ratio));
-    if (this.canvas.width !== width) this.canvas.width = width; if (this.canvas.height !== height) this.canvas.height = height; this.pixelRatio = ratio;
+    this.presentation.resize(width, height);
+    if (this.overlay.width !== width) this.overlay.width = width; if (this.overlay.height !== height) this.overlay.height = height; this.pixelRatio = ratio;
     return { width: width / ratio, height: height / ratio, pixelRatio: ratio };
   }
 
@@ -63,13 +76,17 @@ export class PassauPixelRenderer {
     const display = this.resize(); const viewport = options.viewport ?? { x: 0, y: 0, width: display.width, height: display.height };
     const cameraTarget = options.cameraTarget ?? { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 };
     const camera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
-    this.present(camera); this.presentText(renderLevel, camera, elapsed, options.language ?? 'standard');
+    this.overlayContext.setTransform(1, 0, 0, 1, 0, 0); this.overlayContext.clearRect(0, 0, this.overlay.width, this.overlay.height);
+    this.presentText(renderLevel, camera, elapsed, options.language ?? 'standard');
     if (options.editor?.selections?.length) this.presentEditorSelections(options.editor.selections, camera, level.board.tileSize, elapsed);
     if (options.editor?.transformSelection) this.presentTransformSelection(options.editor.transformSelection, camera, level.board.tileSize);
+    const profile = resolvePostProcessProfile(level, snapshot, { quality: options.quality ?? this.quality, reducedMotion: options.reducedMotion });
+    const hasOverlay = renderLevel.decorations.some((item) => item.type === 'text') || Boolean(options.editor?.selections?.length || options.editor?.transformSelection);
+    this.present(camera, profile, elapsed, hasOverlay);
     const tile = level.board.tileSize; const playerScreen = projectWorldPoint(camera, { x: player.x * tile + tile / 2, y: player.y * tile + tile / 2 }); const bounds = visibleWorldBounds(camera);
     const entities = cats.map((cat, index) => { const world = { x: cat.x * tile + tile / 2, y: cat.y * tile + tile / 2 }; return { id: cat.id ?? `cat-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - cat.x, player.y - cat.y), color: cat.color, respawnTimer: cat.respawnTimer ?? 0 }; });
     const characterEntities = characters.map((character, index) => { const world = { x: character.x * tile + tile / 2, y: character.y * tile + tile / 2 }; return { id: character.id ?? `character-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - character.x, player.y - character.y), color: character.color }; });
-    return { camera, playerScreen, entities, characterEntities, display };
+    return { camera, playerScreen, entities, characterEntities, display, renderer: this.rendererInfo() };
   }
 
   setLevelIfChanged(levelInput) {
@@ -82,16 +99,14 @@ export class PassauPixelRenderer {
     gradient.addColorStop(0, 'rgba(2, 8, 12, 0)'); gradient.addColorStop(1, 'rgba(2, 8, 12, 0.28)'); context.fillStyle = gradient; context.fillRect(0, 0, width, height);
   }
 
-  present(camera) {
-    const context = this.context; const { source, viewport } = camera; const ratio = this.pixelRatio;
-    context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, this.canvas.width, this.canvas.height); context.imageSmoothingEnabled = false;
-    context.drawImage(this.scene, source.x * 2, source.y * 2, source.width * 2, source.height * 2, viewport.x * ratio, viewport.y * ratio, viewport.width * ratio, viewport.height * ratio);
+  present(camera, profile, elapsed, hasOverlay) {
+    this.presentation.present({ scene: this.scene, overlay: this.overlay, hasOverlay, camera, profile, elapsed, pixelRatio: this.pixelRatio, sceneScale: this.sceneScale });
   }
 
   presentText(level, camera, elapsed, language) {
     const items = level.decorations.filter((item) => item.type === 'text');
     if (!items.length) return;
-    const context = this.context; const ratio = this.pixelRatio; const tile = level.board.tileSize;
+    const context = this.overlayContext; const ratio = this.pixelRatio; const tile = level.board.tileSize;
     const scale = camera.viewport.width / camera.source.width * ratio;
     const screenTile = tile * scale;
     const viewport = {
@@ -117,7 +132,7 @@ export class PassauPixelRenderer {
   }
 
   presentTransformSelection(selection, camera, tile) {
-    const ratio = this.pixelRatio; const context = this.context;
+    const ratio = this.pixelRatio; const context = this.overlayContext;
     const project = (x, y) => ({
       x: (camera.viewport.x + (x * tile - camera.source.x) / camera.source.width * camera.viewport.width) * ratio,
       y: (camera.viewport.y + (y * tile - camera.source.y) / camera.source.height * camera.viewport.height) * ratio,
@@ -136,7 +151,7 @@ export class PassauPixelRenderer {
   }
 
   presentEditorSelections(selections, camera, tile, elapsed = 0) {
-    const ratio = this.pixelRatio; const context = this.context;
+    const ratio = this.pixelRatio; const context = this.overlayContext;
     const project = (x, y) => ({
       x: (camera.viewport.x + (x * tile - camera.source.x) / camera.source.width * camera.viewport.width) * ratio,
       y: (camera.viewport.y + (y * tile - camera.source.y) / camera.source.height * camera.viewport.height) * ratio,
@@ -157,4 +172,12 @@ export class PassauPixelRenderer {
     });
     context.restore();
   }
+
+  rendererInfo() {
+    return { ...this.presentation.snapshot(), quality: this.quality, pixelRatio: this.pixelRatio };
+  }
+
+  finish() { return this.presentation.finish?.(); }
+
+  destroy() { this.presentation.destroy?.(); }
 }
