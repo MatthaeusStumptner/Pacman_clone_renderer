@@ -40,6 +40,7 @@ test('keeps reusable custom characters separate from enemy cats and exposes them
   const level = valid();
   level.actors.characters = [{
     id: 'passau-postler', characterId: 'postler', name: 'Passauer Postler', x: 2, y: 5, state: 'left',
+    scale: 2.25,
     appearance: { width: 4, height: 4, palette: ['transparent', '#55d9dd'], pixels: ['0110', '1111', '0110', '1001'] },
     behavior: { controller: 'patrol', speedMultiplier: 0.75 },
   }];
@@ -53,10 +54,17 @@ test('keeps reusable custom characters separate from enemy cats and exposes them
   assert.equal(normalized.actors.characters[0].characterId, 'postler');
   assert.equal(normalized.actors.characters[0].name, 'Passauer Postler');
   assert.equal(normalized.actors.characters[0].behavior.controller, 'patrol');
+  assert.equal(normalized.actors.characters[0].scale, 2.25);
   const sample = sampleCutscene(normalized, normalized.cutscenes[0], 1);
   assert.equal(sample.characters.length, 1);
   assert.equal(sample.characters[0].x, 3.5);
   assert.equal(sample.characters[0].direction.name, 'right');
+});
+
+test('clamps reusable character display scales to the public renderer contract', () => {
+  const level = valid();
+  level.actors.characters = [{ id: 'klein', x: 1, y: 1, scale: 0.1 }, { id: 'gross', x: 2, y: 2, scale: 12 }];
+  assert.deepEqual(createLevelDocument(level).actors.characters.map((character) => character.scale), [0.5, 4]);
 });
 
 test('assigns stable unique actor ids and preserves authored cat ids', () => {

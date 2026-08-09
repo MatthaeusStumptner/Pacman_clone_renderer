@@ -31,19 +31,20 @@ vec2 effect_uv(vec2 uv) {
   float time = u_effect.x * u_effect.w;
   float mode = u_effect.y;
   float intensity = u_effect.z;
+  float distortion = u_feedback.z;
   if (mode < 0.5) return uv;
   if (mode < 1.5) {
-    uv.x += (sin(uv.y * 31.0 + time * 1.8) + sin(uv.y * 13.0 - time * 1.1)) * 0.0018 * intensity;
+    uv.x += (sin(uv.y * 31.0 + time * 1.8) + sin(uv.y * 13.0 - time * 1.1)) * 0.0018 * intensity * distortion;
   } else if (mode < 2.5) {
-    uv += vec2(sin(uv.y * 9.0 + time * 0.42), cos(uv.x * 7.0 - time * 0.33)) * 0.00065 * intensity;
+    uv += vec2(sin(uv.y * 9.0 + time * 0.42), cos(uv.x * 7.0 - time * 0.33)) * 0.00065 * intensity * distortion;
   } else if (mode < 3.5) {
-    uv.y += sin(uv.x * 21.0 + time * 0.75) * 0.00055 * intensity;
+    uv.y += sin(uv.x * 21.0 + time * 0.75) * 0.00055 * intensity * distortion;
   } else if (mode < 4.5) {
-    uv.x += step(0.965, hash21(vec2(floor(uv.y * 28.0), floor(time * 3.0)))) * sin(time * 9.0) * 0.002 * intensity;
+    uv.x += step(0.965, hash21(vec2(floor(uv.y * 28.0), floor(time * 3.0)))) * sin(time * 9.0) * 0.002 * intensity * distortion;
   } else if (mode < 5.5) {
-    uv.x += sin(uv.y * 44.0 + time * 2.4) * (1.0 - uv.y) * 0.0016 * intensity;
+    uv.x += sin(uv.y * 44.0 + time * 2.4) * (1.0 - uv.y) * 0.0016 * intensity * distortion;
   } else {
-    uv.x += sin(uv.y * 55.0 + time * 3.0) * 0.0015 * intensity;
+    uv.x += sin(uv.y * 55.0 + time * 3.0) * 0.0015 * intensity * distortion;
   }
   return clamp(uv, 0.001, 0.999);
 }
@@ -57,7 +58,7 @@ void main() {
   float intensity = u_effect.z;
 
   if (mode > 5.5) {
-    float shift = 0.0022 * intensity * (0.55 + sin(time * 3.1) * 0.25);
+    float shift = 0.0022 * intensity * u_feedback.z * (0.55 + sin(time * 3.1) * 0.25);
     color.r = texture(u_scene, u_source.xy + clamp(uv + vec2(shift, 0.0), 0.001, 0.999) * u_source.zw).r;
     color.b = texture(u_scene, u_source.xy + clamp(uv - vec2(shift, 0.0), 0.001, 0.999) * u_source.zw).b;
   }
@@ -128,19 +129,20 @@ fn effectUv(inputUv: vec2f) -> vec2f {
   let time = uniforms.effect.x * uniforms.effect.w;
   let mode = uniforms.effect.y;
   let intensity = uniforms.effect.z;
+  let distortion = uniforms.feedback.z;
   if (mode < 0.5) { return uv; }
   if (mode < 1.5) {
-    uv.x += (sin(uv.y * 31.0 + time * 1.8) + sin(uv.y * 13.0 - time * 1.1)) * 0.0018 * intensity;
+    uv.x += (sin(uv.y * 31.0 + time * 1.8) + sin(uv.y * 13.0 - time * 1.1)) * 0.0018 * intensity * distortion;
   } else if (mode < 2.5) {
-    uv += vec2f(sin(uv.y * 9.0 + time * 0.42), cos(uv.x * 7.0 - time * 0.33)) * 0.00065 * intensity;
+    uv += vec2f(sin(uv.y * 9.0 + time * 0.42), cos(uv.x * 7.0 - time * 0.33)) * 0.00065 * intensity * distortion;
   } else if (mode < 3.5) {
-    uv.y += sin(uv.x * 21.0 + time * 0.75) * 0.00055 * intensity;
+    uv.y += sin(uv.x * 21.0 + time * 0.75) * 0.00055 * intensity * distortion;
   } else if (mode < 4.5) {
-    uv.x += step(0.965, hash21(vec2f(floor(uv.y * 28.0), floor(time * 3.0)))) * sin(time * 9.0) * 0.002 * intensity;
+    uv.x += step(0.965, hash21(vec2f(floor(uv.y * 28.0), floor(time * 3.0)))) * sin(time * 9.0) * 0.002 * intensity * distortion;
   } else if (mode < 5.5) {
-    uv.x += sin(uv.y * 44.0 + time * 2.4) * (1.0 - uv.y) * 0.0016 * intensity;
+    uv.x += sin(uv.y * 44.0 + time * 2.4) * (1.0 - uv.y) * 0.0016 * intensity * distortion;
   } else {
-    uv.x += sin(uv.y * 55.0 + time * 3.0) * 0.0015 * intensity;
+    uv.x += sin(uv.y * 55.0 + time * 3.0) * 0.0015 * intensity * distortion;
   }
   return clamp(uv, vec2f(0.001), vec2f(0.999));
 }
@@ -155,7 +157,7 @@ fn effectUv(inputUv: vec2f) -> vec2f {
   let intensity = uniforms.effect.z;
 
   if (mode > 5.5) {
-    let shift = 0.0022 * intensity * (0.55 + sin(time * 3.1) * 0.25);
+    let shift = 0.0022 * intensity * uniforms.feedback.z * (0.55 + sin(time * 3.1) * 0.25);
     let shiftedRed = textureSample(sceneTexture, nearestSampler, uniforms.source.xy + clamp(uv + vec2f(shift, 0.0), vec2f(0.001), vec2f(0.999)) * uniforms.source.zw).r;
     let shiftedBlue = textureSample(sceneTexture, nearestSampler, uniforms.source.xy + clamp(uv - vec2f(shift, 0.0), vec2f(0.001), vec2f(0.999)) * uniforms.source.zw).b;
     rgb = vec3f(shiftedRed, rgb.g, shiftedBlue);

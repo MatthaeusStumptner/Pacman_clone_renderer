@@ -437,6 +437,7 @@ export function createLevelDocument(input = {}) {
         renderer: text(character?.renderer, 'pixel-art'),
         state: ['idle', 'up', 'right', 'down', 'left'].includes(character?.state) ? character.state : 'idle',
         animation: text(character?.animation, ''),
+        scale: clamp(finite(character?.scale, 1), 0.5, 4),
         color: color(character?.color, '#55d9dd'),
         accent: color(character?.accent, '#f5c451'),
         appearance: normalizeAppearance(character?.appearance),

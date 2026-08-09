@@ -5,6 +5,7 @@ const requestedBackend = parameters.get('backend') ?? 'webgl2';
 const supportedProfiles = new Set(['notebook', 'tablet', 'mobile', 'weak-mobile', 'desktop']);
 const profileName = supportedProfiles.has(parameters.get('profile')) ? parameters.get('profile') : 'notebook';
 const quality = parameters.get('quality') ?? 'auto';
+const scene = parameters.get('scene') === 'cutscene' ? 'cutscene' : 'gameplay';
 const frameTarget = Math.max(60, Math.min(900, Number(parameters.get('frames')) || 180));
 const canvas = document.querySelector('#benchmark');
 const output = document.querySelector('#result');
@@ -24,7 +25,7 @@ function benchmarkLevel() {
     animation: { type: index % 2 ? 'pulse' : 'float', speed: 0.8 + index % 5 * 0.15, amplitude: 0.14 },
   }));
   return createLevelDocument({
-    id: 'gpu-benchmark',
+    id: 'zauberberg',
     board: { columns: 25, rows: 25, tileSize: 24, tunnelRows: [12], walls },
     theme: {
       id: 'zauberberg',
@@ -71,8 +72,11 @@ async function run() {
     const elapsed = frame / 60;
     const player = { x: 12 + Math.sin(elapsed * 0.85) * 7.5, y: 12 + Math.cos(elapsed * 0.63) * 7.5, direction: { name: 'right', x: 1, y: 0 }, effects: level.actors.player.effects };
     const cats = level.actors.cats.map((cat, index) => ({ ...cat, x: cat.x + Math.sin(elapsed * (0.7 + index * 0.04)) * 2.5, y: cat.y + Math.cos(elapsed * (0.6 + index * 0.05)) * 2 }));
+    const decorations = scene === 'cutscene'
+      ? level.decorations.map((item, index) => ({ ...item, x: item.x + Math.sin(elapsed * 0.7 + index) * 0.35 }))
+      : undefined;
     const started = performance.now();
-    const result = renderer.render({ level, player, cats, pellets, powerUps, elapsed, powerTimer: Math.sin(elapsed * 0.5) > 0.78 ? 3 : 0, hitTimer: 0 }, { cameraEnabled: true, quality, reducedMotion: false });
+    const result = renderer.render({ level, player, cats, decorations, pellets, powerUps, elapsed, powerTimer: Math.sin(elapsed * 0.5) > 0.78 ? 3 : 0, hitTimer: 0 }, { cameraEnabled: true, quality, reducedMotion: false });
     if (measured) renderSamples.push(performance.now() - started);
     return result.renderer;
   };
@@ -96,6 +100,7 @@ async function run() {
     autoSelected: requestedBackend === 'auto' ? info.backend : null,
     quality: info.quality,
     profile: profileName,
+    scene,
     pixelRatio: info.pixelRatio,
     uploadedMegabytes: Math.round((info.uploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
     ...summary,
