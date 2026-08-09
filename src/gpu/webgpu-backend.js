@@ -77,6 +77,7 @@ export class WebGPUPresentationBackend {
       width: overlay.width,
       height: overlay.height,
       texture: this.device.createTexture({ size: [overlay.width, overlay.height], format: 'rgba8unorm', usage }),
+      uploaded: false,
     };
     this.bindGroup = this.device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
@@ -94,8 +95,13 @@ export class WebGPUPresentationBackend {
     const overlaySource = hasOverlay ? overlay : this.emptyOverlay;
     this.ensureTextures(scene, overlaySource);
     this.device.queue.copyExternalImageToTexture({ source: scene }, { texture: this.sceneTexture.texture }, [scene.width, scene.height]);
-    this.device.queue.copyExternalImageToTexture({ source: overlaySource }, { texture: this.overlayTexture.texture }, [overlaySource.width, overlaySource.height]);
-    this.uploadedBytes += (scene.width * scene.height + overlaySource.width * overlaySource.height) * 4;
+    let overlayBytes = 0;
+    if (hasOverlay || !this.overlayTexture.uploaded) {
+      this.device.queue.copyExternalImageToTexture({ source: overlaySource }, { texture: this.overlayTexture.texture }, [overlaySource.width, overlaySource.height]);
+      this.overlayTexture.uploaded = true;
+      overlayBytes = overlaySource.width * overlaySource.height * 4;
+    }
+    this.uploadedBytes += scene.width * scene.height * 4 + overlayBytes;
     const uniforms = new Float32Array([
       camera.source.x * sceneScale / scene.width,
       camera.source.y * sceneScale / scene.height,
@@ -168,7 +174,7 @@ export class WebGPUPresentationBackend {
 async function initializeWebGPU(canvas, options = {}) {
   const gpu = options.gpu ?? globalThis.navigator?.gpu;
   if (!gpu) return null;
-  const adapter = options.adapter ?? await gpu.requestAdapter({ powerPreference: options.powerPreference ?? 'low-power' });
+  const adapter = options.adapter ?? await gpu.requestAdapter({ powerPreference: options.powerPreference ?? 'high-performance' });
   if (!adapter) return null;
   const device = await adapter.requestDevice();
   const module = device.createShaderModule({ code: WEBGPU_SHADER });

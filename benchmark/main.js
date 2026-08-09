@@ -2,8 +2,9 @@ import { PassauPixelRenderer, createLevelDocument, evaluatePerformanceBudget, su
 
 const parameters = new URLSearchParams(location.search);
 const requestedBackend = parameters.get('backend') ?? 'webgl2';
-const profileName = parameters.get('profile') === 'mobile' ? 'mobile' : 'desktop';
-const quality = parameters.get('quality') ?? (profileName === 'mobile' ? 'performance' : 'quality');
+const supportedProfiles = new Set(['notebook', 'tablet', 'mobile', 'weak-mobile', 'desktop']);
+const profileName = supportedProfiles.has(parameters.get('profile')) ? parameters.get('profile') : 'notebook';
+const quality = parameters.get('quality') ?? 'auto';
 const frameTarget = Math.max(60, Math.min(900, Number(parameters.get('frames')) || 180));
 const canvas = document.querySelector('#benchmark');
 const output = document.querySelector('#result');
@@ -91,8 +92,9 @@ async function run() {
   const result = Object.freeze({
     requestedBackend,
     resolvedBackend: info.backend,
-    fallback: requestedBackend !== info.backend,
-    quality,
+    fallback: requestedBackend !== 'auto' && requestedBackend !== info.backend,
+    autoSelected: requestedBackend === 'auto' ? info.backend : null,
+    quality: info.quality,
     profile: profileName,
     pixelRatio: info.pixelRatio,
     uploadedMegabytes: Math.round((info.uploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,

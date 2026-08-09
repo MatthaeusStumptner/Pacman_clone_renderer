@@ -45,14 +45,16 @@ Das maschinenlesbare Schema liegt unter `schema/franz-lola-level.schema.json` un
 
 Die Spiellogik und die Pixelwelt bleiben deterministisch in Canvas2D. Eine getrennte Präsentationsschicht kann das fertige Bild anschließend mit WebGL 2 (GLSL ES) oder WebGPU (WGSL) verarbeiten. Dadurch bleiben Level-JSON, Kollisionen, Editor und GitHub-Pages-Deployment unverändert statisch; nur Licht, Atmosphäre und Bildschirm-Feedback laufen optional auf der GPU.
 
-`backend: 'auto'` ist der produktive Standard. Schwache Geräte erhalten direkt Canvas2D. Auf stärkeren Geräten misst ein kurzer Start-Probe die tatsächliche GPU-Leistung und aktiviert WebGPU oder WebGL 2 nur, wenn der Kandidat schnell genug ist. Nicht verfügbare APIs, Shaderfehler und langsame Software-GPUs fallen kontrolliert auf den kompatiblen Pfad zurück. `quality: 'auto'` begrenzt zusätzlich interne Auflösung und Device-Pixel-Ratio anhand von Speicher und CPU-Kernen.
+`backend: 'auto'` ist der produktive Standard. Notebooks, Tablets und moderne Handys bleiben GPU-berechtigt und werden mit einem aufgewärmten Laufzeit-Probe geprüft. Nur das klar eingeschränkte `performance`-Profil verwendet ein strenges Gate. Nicht verfügbare APIs, Shaderfehler und langsame Software-GPUs fallen kontrolliert auf Canvas2D zurück. `quality: 'auto'` begrenzt zusätzlich interne Auflösung und Device-Pixel-Ratio anhand von Speicher und CPU-Kernen.
+
+Die Pixelwelt wird auf GPU-Backends in nativer Auflösung übertragen und kameraabhängig zugeschnitten. Die statische Umgebung bleibt gecacht; kontinuierliche Atmosphäre, Farbe und Bildschirm-Feedback übernimmt der Shader. Dadurch bleiben Figuren flüssig, ohne die gesamte Levelgrafik pro Frame auf der CPU neu aufzubauen oder hochzuladen.
 
 ```js
 const renderer = await PassauPixelRenderer.create(canvas, {
   backend: 'auto',
   preferWebGPU: true,
   quality: 'auto',
-  powerPreference: 'low-power',
+  powerPreference: 'high-performance',
 });
 ```
 
@@ -62,15 +64,16 @@ Für Diagnose und Vergleich können `canvas2d`, `webgl2` und `webgpu` explizit a
 
 ### Performance-Benchmark
 
-Der Browser-Benchmark rendert ein absichtlich dichtes 25×25-Level und vergleicht Canvas2D, WebGL 2 und die produktive Automatik. Das Mobile-Profil verwendet 360×740 Pixel und vierfache CPU-Drosselung. Gemessen werden Render-p50/p95/p99, Frame-p95, effektive FPS, lange Frames, Long Tasks und GPU-Uploadvolumen. Nur die Automatik ist ein Release-Gate, weil explizite Backends bewusst auch langsame Softwareimplementierungen sichtbar machen sollen.
+Der Browser-Benchmark rendert ein absichtlich dichtes 25×25-Level und vergleicht Canvas2D, WebGL 2 und die produktive Automatik in vier Profilen: Notebook (CPU ×2), Tablet (CPU ×2), modernes Handy (CPU ×3) und schwaches Handy (CPU ×6). Speicher und Kernzahl werden dabei ebenfalls emuliert. Gemessen werden Render-p50/p95/p99, Frame-p95, effektive FPS, lange Frames, Long Tasks und GPU-Uploadvolumen. Nur die Automatik ist ein Release-Gate, weil explizite Backends bewusst auch langsame Softwareimplementierungen sichtbar machen sollen.
 
 ```bash
 npm run benchmark
 npm run benchmark:assert
+npm run benchmark -- --auto-only --assert
 npm run benchmark -- --frames=300 --webgpu
 ```
 
-Die aktuellen Budgets liegen bei Desktop-p95 ≤ 12 ms und Mobile-p95 ≤ 28 ms. So bleibt die Vergleichsbasis reproduzierbar, und eine spätere Optimierung kann gegen dieselben Szenarien gemessen werden.
+Die aktuellen Render-p95-Budgets liegen bei Notebook ≤ 14 ms, Tablet ≤ 20 ms, modernem Handy ≤ 24 ms und schwachem Handy ≤ 36 ms. Die jeweils automatisch gewählte Implementierung ist das Release-Gate.
 
 `FixedStepLoop` und `LevelSimulation` sind der gemeinsame Gameplay-Vertrag. Die Simulation läuft mit festen 120 Updates pro Sekunde; Displays mit 60, 120 oder 175 Hz zeigen interpolierte Bilder, ohne Spieltempo, Kollisionen oder Richtungswechsel zu verändern.
 

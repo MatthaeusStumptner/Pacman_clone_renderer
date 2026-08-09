@@ -11,8 +11,8 @@ test('summarizes deterministic render and frame percentiles', () => {
   assert.equal(summary.longTaskDurationMs, 8.4);
 });
 
-test('evaluates desktop and weak-mobile budgets independently', () => {
+test('evaluates notebook and weak-mobile budgets independently', () => {
   const summary = { renderP95Ms: 12, frameP95Ms: 30, longFramePercent: 20 };
-  assert.equal(evaluatePerformanceBudget(summary, 'desktop').passed, false);
-  assert.equal(evaluatePerformanceBudget(summary, 'mobile').passed, true);
+  assert.equal(evaluatePerformanceBudget(summary, 'notebook').passed, false);
+  assert.equal(evaluatePerformanceBudget(summary, 'weak-mobile').passed, true);
 });
