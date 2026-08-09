@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { LEVEL_EFFECT_PROFILES, rendererPixelRatioLimit, resolvePostProcessProfile, resolveRendererQuality } from '../src/gpu/effect-profile.js';
 import { WEBGL_FRAGMENT_SHADER, WEBGPU_SHADER } from '../src/gpu/shaders.js';
 
@@ -39,4 +40,11 @@ test('ships compatible GLSL and WGSL fragment entry points without WGSL swizzle 
   assert.match(WEBGPU_SHADER, /@fragment fn fragmentMain/);
   assert.doesNotMatch(WEBGPU_SHADER, /color\.rgb\s*[+*]?=/);
   assert.match(WEBGPU_SHADER, /var rgb = color\.rgb/);
+});
+
+test('prepares browser canvases for valid WebGPU texture uploads', async () => {
+  const source = await readFile(new URL('../src/gpu/webgpu-backend.js', import.meta.url), 'utf8');
+
+  assert.match(source, /GPUTextureUsage\.RENDER_ATTACHMENT/);
+  assert.match(source, /emptyOverlay\.getContext\('2d'\)/);
 });

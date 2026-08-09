@@ -18,6 +18,9 @@ export class WebGPUPresentationBackend {
     this.destroyed = false;
     this.emptyOverlay = (canvas.ownerDocument ?? globalThis.document).createElement('canvas');
     this.emptyOverlay.width = 1; this.emptyOverlay.height = 1;
+    const emptyOverlayContext = this.emptyOverlay.getContext('2d');
+    emptyOverlayContext.clearRect(0, 0, 1, 1);
+    emptyOverlayContext.fillStyle = 'rgba(0, 0, 0, 0)'; emptyOverlayContext.fillRect(0, 0, 1, 1);
     this.sampler = device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' });
     this.uniformBuffer = device.createBuffer({
       size: UNIFORM_FLOATS * Float32Array.BYTES_PER_ELEMENT,
@@ -61,7 +64,9 @@ export class WebGPUPresentationBackend {
   }
 
   ensureTextures(scene, overlay) {
-    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    // Chromium's copyExternalImageToTexture validation requires imported canvas
+    // destinations to be both copy targets and render attachments.
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
     const changed = !this.sceneTexture
       || this.sceneTexture.width !== scene.width || this.sceneTexture.height !== scene.height
       || !this.overlayTexture || this.overlayTexture.width !== overlay.width || this.overlayTexture.height !== overlay.height;

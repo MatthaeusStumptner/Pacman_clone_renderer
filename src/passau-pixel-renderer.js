@@ -9,6 +9,21 @@ import { createPresentationBackend, createSyncPresentationBackend } from './gpu/
 
 const clampRatio = (value, maximum = 2) => Math.min(maximum, Math.max(1, Number(value) || 1));
 const interpolate = (entity, alpha) => ({ ...entity, x: Number.isFinite(entity.previousX) ? entity.previousX + (entity.x - entity.previousX) * alpha : entity.x, y: Number.isFinite(entity.previousY) ? entity.previousY + (entity.y - entity.previousY) * alpha : entity.y });
+const actorScale = (actor) => Math.max(0.5, Math.min(4, Number(actor?.scale) || 1));
+
+function drawScaledActor(context, actor, tileSize, draw) {
+  const scale = actorScale(actor);
+  if (scale === 1) return draw();
+  const centerX = actor.x * tileSize + tileSize / 2;
+  const centerY = actor.y * tileSize + tileSize / 2;
+  context.save();
+  context.translate(centerX, centerY);
+  context.scale(scale, scale);
+  context.translate(-centerX, -centerY);
+  const result = draw();
+  context.restore();
+  return result;
+}
 
 export class PassauPixelRenderer {
   static async create(canvas, options = {}) {
@@ -76,8 +91,9 @@ export class PassauPixelRenderer {
         () => drawCat(scene, { ...cat, elapsed }, level.board.tileSize, { frightened: (snapshot.powerTimer ?? 0) > 0, frightenedTime: snapshot.powerTimer ?? 0 }));
     });
     characters.forEach((character) => {
-      drawWithVisualEffects(scene, character.effects, { left: character.x * level.board.tileSize, top: character.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
-        () => drawWalker(scene, { ...character, direction: character.state, elapsed }, level.board.tileSize, { elapsed, hitTimer: 0 }));
+      const scale = actorScale(character); const size = level.board.tileSize * scale;
+      drawWithVisualEffects(scene, character.effects, { left: character.x * level.board.tileSize + (level.board.tileSize - size) / 2, top: character.y * level.board.tileSize + (level.board.tileSize - size) / 2, width: size, height: size }, elapsed,
+        () => drawScaledActor(scene, character, level.board.tileSize, () => drawWalker(scene, { ...character, direction: character.state, elapsed }, level.board.tileSize, { elapsed, hitTimer: 0 })));
     });
     drawWithVisualEffects(scene, player.effects, { left: player.x * level.board.tileSize, top: player.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
       () => drawWalker(scene, player, level.board.tileSize, { elapsed, hitTimer: snapshot.hitTimer }));
