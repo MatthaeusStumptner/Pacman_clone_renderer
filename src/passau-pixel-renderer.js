@@ -2,7 +2,7 @@ import { calculateCamera, projectWorldPoint, visibleWorldBounds } from './camera
 import { compileWallGrid, createLevelDocument } from './level-format.js';
 import { drawCat, drawWalker } from './painters/characters.js';
 import { drawCollectibles, drawEasterEggs } from './painters/collectibles.js';
-import { drawDecoration, drawEditorGrid, drawEnvironment } from './painters/environment.js';
+import { drawDecoration, drawDecorations, drawEditorGrid, drawEnvironment } from './painters/environment.js';
 import { drawWithVisualEffects } from './visual-effects.js';
 import { resolvePostProcessProfile, resolveRendererQuality, rendererPixelRatioLimit } from './gpu/effect-profile.js';
 import { createPresentationBackend, createSyncPresentationBackend } from './gpu/presentation-backend.js';
@@ -29,7 +29,7 @@ export class PassauPixelRenderer {
       : 1;
     this.scene = this.document.createElement('canvas'); this.sceneContext = this.scene.getContext('2d');
     this.environment = this.document.createElement('canvas'); this.environmentContext = this.environment.getContext('2d');
-    this.environmentCache = { board: null, theme: null, decorations: null, language: '', frame: -1 };
+    this.environmentCache = { board: null, theme: null, language: '', frame: -1 };
     this.gpuScene = this.presentation.kind === 'canvas2d' ? null : this.document.createElement('canvas');
     this.gpuSceneContext = this.gpuScene?.getContext('2d') ?? null;
     this.overlay = this.document.createElement('canvas'); this.overlayContext = this.overlay.getContext('2d');
@@ -43,7 +43,7 @@ export class PassauPixelRenderer {
     const width = this.level.board.columns * this.level.board.tileSize; const height = this.level.board.rows * this.level.board.tileSize;
     this.scene.width = Math.round(width * this.sceneScale); this.scene.height = Math.round(height * this.sceneScale); this.sceneContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.sceneContext.imageSmoothingEnabled = false;
     this.environment.width = this.scene.width; this.environment.height = this.scene.height; this.environmentContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.environmentContext.imageSmoothingEnabled = false;
-    this.environmentCache = { board: null, theme: null, decorations: null, language: '', frame: -1 };
+    this.environmentCache = { board: null, theme: null, language: '', frame: -1 };
     return this.level;
   }
 
@@ -67,6 +67,7 @@ export class PassauPixelRenderer {
     scene.clearRect(0, 0, worldWidth, worldHeight);
     this.prepareEnvironment(renderLevel, elapsed, options.language ?? 'standard');
     scene.save(); scene.setTransform(1, 0, 0, 1, 0, 0); scene.drawImage(this.environment, 0, 0); scene.restore();
+    drawDecorations(scene, renderLevel, elapsed, options.language ?? 'standard', { excludeText: true });
     drawEasterEggs(scene, renderLevel, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
     drawCollectibles(scene, { pellets: snapshot.pellets, powerUps: snapshot.powerUps }, level.board.tileSize, elapsed);
     cats.forEach((cat) => {
@@ -158,17 +159,16 @@ export class PassauPixelRenderer {
       ? (this.quality === 'performance' ? 8 : this.quality === 'balanced' ? 15 : 20)
       : 0;
     const frame = framesPerSecond ? Math.floor(elapsed * framesPerSecond) : 0;
-    const decorations = level.decorations;
     const cache = this.environmentCache;
-    if (cache.board === level.board && cache.theme === level.theme && cache.decorations === decorations && cache.language === language && cache.frame === frame) return;
+    if (cache.board === level.board && cache.theme === level.theme && cache.language === language && cache.frame === frame) return;
     const width = level.board.columns * level.board.tileSize; const height = level.board.rows * level.board.tileSize;
     const context = this.environmentContext;
     context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
     context.clearRect(0, 0, width, height);
-    drawEnvironment(context, level, this.grid, elapsed, { language, excludeText: true });
+    drawEnvironment(context, level, this.grid, elapsed, { language, excludeText: true, excludeDecorations: true });
     const gradient = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.32, width / 2, height / 2, Math.max(width, height) * 0.72);
     gradient.addColorStop(0, 'rgba(2, 8, 12, 0)'); gradient.addColorStop(1, 'rgba(2, 8, 12, 0.28)'); context.fillStyle = gradient; context.fillRect(0, 0, width, height);
-    this.environmentCache = { board: level.board, theme: level.theme, decorations, language, frame };
+    this.environmentCache = { board: level.board, theme: level.theme, language, frame };
   }
 
   presentText(level, camera, elapsed, language) {

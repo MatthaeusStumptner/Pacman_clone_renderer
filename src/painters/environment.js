@@ -208,7 +208,7 @@ export function drawEnvironment(context, level, grid, elapsed = 0, options = {})
   else if (level.theme.landmark === 'zauberberg') drawStage(context, level, elapsed);
   else drawDogPark(context, level, grid);
   if (level.theme.landmark === 'brahmahof-home') drawHome(context, level);
-  drawDecorations(context, level, elapsed, options.language, { excludeText: options.excludeText });
+  if (!options.excludeDecorations) drawDecorations(context, level, elapsed, options.language, { excludeText: options.excludeText });
 }
 
 export function drawDecorations(context, level, elapsed, language = 'standard', { excludeText = false, onlyText = false } = {}) {

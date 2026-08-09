@@ -124,7 +124,7 @@ export class WebGL2PresentationBackend {
     gl.uniform2f(this.locations.canvasSize, this.canvas.width, this.canvas.height);
     gl.uniform4f(this.locations.effect, elapsed, profile.modeIndex, profile.intensity, profile.motionScale);
     gl.uniform4f(this.locations.tint, profile.tint[0], profile.tint[1], profile.tint[2], profile.vignette);
-    gl.uniform4f(this.locations.feedback, profile.power, profile.hit, profile.reducedMotion ? 1 : 0, profile.scanlines);
+    gl.uniform4f(this.locations.feedback, profile.power, profile.hit, profile.distortion, profile.scanlines);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.frameCount += 1;
   }

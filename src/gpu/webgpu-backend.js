@@ -121,7 +121,7 @@ export class WebGPUPresentationBackend {
       profile.vignette,
       profile.power,
       profile.hit,
-      profile.reducedMotion ? 1 : 0,
+      profile.distortion,
       profile.scanlines,
     ]);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);

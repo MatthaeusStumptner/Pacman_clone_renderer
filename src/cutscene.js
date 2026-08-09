@@ -1,5 +1,17 @@
-const clone = (value) => JSON.parse(JSON.stringify(value));
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+
+function cutsceneLevelView(level) {
+  return {
+    ...level,
+    actors: {
+      ...level.actors,
+      player: { ...level.actors.player },
+      cats: level.actors.cats.map((actor) => ({ ...actor })),
+      characters: (level.actors.characters ?? []).map((actor) => ({ ...actor })),
+    },
+    decorations: level.decorations.map((item) => ({ ...item })),
+  };
+}
 
 function easedRatio(value, easing) {
   const ratio = clamp(value, 0, 1);
@@ -9,7 +21,10 @@ function easedRatio(value, easing) {
 }
 
 function framesAround(keyframes, time) {
-  const previous = [...keyframes].reverse().find((frame) => frame.time <= time) ?? keyframes[0];
+  let previous = keyframes[0];
+  for (let index = keyframes.length - 1; index >= 0; index -= 1) {
+    if (keyframes[index].time <= time) { previous = keyframes[index]; break; }
+  }
   const next = keyframes.find((frame) => frame.time > time) ?? previous;
   const span = next.time - previous.time;
   return { previous, next, ratio: span > 0 ? easedRatio((time - previous.time) / span, next.easing) : 0 };
@@ -34,8 +49,8 @@ export function cutsceneById(level, id = 'intro') {
 }
 
 export function sampleCutscene(levelInput, cutsceneInput, elapsed = 0, language = 'standard') {
-  const level = clone(levelInput);
-  const cutscene = typeof cutsceneInput === 'string' ? cutsceneById(level, cutsceneInput) : cutsceneInput;
+  const level = cutsceneLevelView(levelInput);
+  const cutscene = typeof cutsceneInput === 'string' ? cutsceneById(levelInput, cutsceneInput) : cutsceneInput;
   if (!cutscene) return { level, time: 0, duration: 0, progress: 1, done: true, camera: null, dialogue: null };
   const time = clamp(Number(elapsed) || 0, 0, cutscene.duration);
   let camera = null;
@@ -44,7 +59,11 @@ export function sampleCutscene(levelInput, cutsceneInput, elapsed = 0, language 
   cutscene.tracks.forEach((track) => {
     if (!track.keyframes?.length) return;
     if (track.type === 'dialogue') {
-      const active = [...track.keyframes].reverse().find((frame) => time >= frame.time && time < frame.time + frame.duration);
+      let active = null;
+      for (let index = track.keyframes.length - 1; index >= 0; index -= 1) {
+        const frame = track.keyframes[index];
+        if (time >= frame.time && time < frame.time + frame.duration) { active = frame; break; }
+      }
       if (active) dialogue = { speaker: active.speaker, text: active.text?.[language] || active.text?.standard || '', remaining: active.time + active.duration - time };
       return;
     }

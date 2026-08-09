@@ -21,21 +21,24 @@ try {
     { profile: 'weak-mobile', viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, cpuRate: 6, memory: 2, cores: 4 },
   ];
   const backends = autoOnly ? ['auto'] : includeWebGPU ? ['canvas2d', 'webgl2', 'webgpu', 'auto'] : ['canvas2d', 'webgl2', 'auto'];
+  const scenes = ['gameplay', 'cutscene'];
   for (const scenario of scenarios) {
     for (const backend of backends) {
-      const context = await browser.newContext({ viewport: scenario.viewport, deviceScaleFactor: scenario.deviceScaleFactor });
-      await context.addInitScript(({ memory, cores }) => {
-        Object.defineProperty(Navigator.prototype, 'deviceMemory', { configurable: true, get: () => memory });
-        Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { configurable: true, get: () => cores });
-      }, { memory: scenario.memory, cores: scenario.cores });
-      const page = await context.newPage();
-      const cdp = await context.newCDPSession(page);
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate: scenario.cpuRate });
-      const url = `http://127.0.0.1:${port}/benchmark.html?backend=${backend}&profile=${scenario.profile}&quality=auto&frames=${frames}`;
-      await page.goto(url, { waitUntil: 'networkidle' });
-      const result = await page.evaluate(() => window.__RENDER_BENCHMARK__);
-      results.push({ ...result, cpuThrottling: scenario.cpuRate, deviceMemory: scenario.memory, hardwareConcurrency: scenario.cores, viewport: scenario.viewport });
-      await context.close();
+      for (const scene of scenes) {
+        const context = await browser.newContext({ viewport: scenario.viewport, deviceScaleFactor: scenario.deviceScaleFactor });
+        await context.addInitScript(({ memory, cores }) => {
+          Object.defineProperty(Navigator.prototype, 'deviceMemory', { configurable: true, get: () => memory });
+          Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { configurable: true, get: () => cores });
+        }, { memory: scenario.memory, cores: scenario.cores });
+        const page = await context.newPage();
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Emulation.setCPUThrottlingRate', { rate: scenario.cpuRate });
+        const url = `http://127.0.0.1:${port}/benchmark.html?backend=${backend}&profile=${scenario.profile}&quality=auto&scene=${scene}&frames=${frames}`;
+        await page.goto(url, { waitUntil: 'networkidle' });
+        const result = await page.evaluate(() => window.__RENDER_BENCHMARK__);
+        results.push({ ...result, cpuThrottling: scenario.cpuRate, deviceMemory: scenario.memory, hardwareConcurrency: scenario.cores, viewport: scenario.viewport });
+        await context.close();
+      }
     }
   }
 } finally {
