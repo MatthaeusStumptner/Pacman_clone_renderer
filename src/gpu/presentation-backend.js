@@ -8,7 +8,7 @@ const backendName = (value) => ['canvas2d', 'webgl2', 'webgpu', 'auto'].includes
 function probeResources(canvas, quality) {
   const document = canvas.ownerDocument ?? globalThis.document;
   const scene = document.createElement('canvas');
-  const sceneScale = quality === 'quality' ? 2 : 1.5;
+  const sceneScale = 1;
   scene.width = Math.round(600 * sceneScale); scene.height = Math.round(600 * sceneScale);
   const context = scene.getContext('2d');
   context.fillStyle = '#071016'; context.fillRect(0, 0, scene.width, scene.height);
@@ -33,11 +33,17 @@ async function probeCandidate(canvas, kind, options, quality) {
     if (!backend) return false;
     const resources = probeResources(canvas, quality);
     backend.resize(720, 480);
-    const started = performance.now();
-    for (let frame = 0; frame < 6; frame += 1) backend.present({ ...resources, hasOverlay: false, pixelRatio: 1, elapsed: frame / 60 });
+    for (let frame = 0; frame < 3; frame += 1) backend.present({ ...resources, hasOverlay: false, pixelRatio: 1, elapsed: frame / 60 });
     await backend.finish();
-    const average = (performance.now() - started) / 6;
-    return average <= (quality === 'quality' ? 6 : 4.5);
+    const started = performance.now();
+    for (let frame = 0; frame < 9; frame += 1) backend.present({ ...resources, hasOverlay: false, pixelRatio: 1, elapsed: frame / 60 });
+    await backend.finish();
+    const average = (performance.now() - started) / 9;
+    // Modern integrated GPUs can still show conservative timings in a short
+    // headless-style upload probe. Balanced and quality devices remain GPU
+    // eligible up to one 60 Hz frame; constrained devices keep the strict gate.
+    const threshold = quality === 'performance' ? 8 : 16.5;
+    return average <= threshold;
   } catch {
     return false;
   } finally {
@@ -48,7 +54,6 @@ async function probeCandidate(canvas, kind, options, quality) {
 export function createSyncPresentationBackend(canvas, options = {}) {
   const requested = backendName(options.backend);
   if (requested === 'webgpu') throw new Error('WebGPU benötigt PassauPixelRenderer.create(...).');
-  if (requested === 'auto' && resolveRendererQuality(options.quality) === 'performance') return new Canvas2DPresentationBackend(canvas);
   if (requested === 'auto' || requested === 'webgl2') {
     const backend = createWebGL2Backend(canvas, options);
     if (backend) return backend;
@@ -60,7 +65,6 @@ export function createSyncPresentationBackend(canvas, options = {}) {
 export async function createPresentationBackend(canvas, options = {}) {
   const requested = backendName(options.backend);
   const quality = resolveRendererQuality(options.quality);
-  if (requested === 'auto' && quality === 'performance') return new Canvas2DPresentationBackend(canvas);
   if (requested === 'webgpu' || (requested === 'auto' && options.preferWebGPU !== false && await probeCandidate(canvas, 'webgpu', options, quality))) {
     try {
       const backend = await createWebGPUBackend(canvas, options);

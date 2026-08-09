@@ -44,8 +44,11 @@ export function resolveRendererQuality(value = 'auto', environment = globalThis.
   if (['performance', 'balanced', 'quality'].includes(value)) return value;
   const memory = Number(environment?.deviceMemory) || 8;
   const cores = Number(environment?.hardwareConcurrency) || 8;
-  if (memory <= 4 || cores <= 4) return 'performance';
-  if (memory <= 8 || cores <= 8) return 'balanced';
+  // Browser-reported memory is deliberately coarse and often capped at 4 GB on
+  // perfectly capable phones. Only genuinely constrained devices lose internal
+  // resolution; the runtime GPU probe remains the final authority for effects.
+  if (memory <= 2 || cores <= 2) return 'performance';
+  if (memory <= 4 || cores <= 4) return 'balanced';
   return 'quality';
 }
 

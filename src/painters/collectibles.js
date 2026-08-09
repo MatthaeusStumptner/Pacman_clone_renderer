@@ -1,11 +1,23 @@
+const coordinateCache = new WeakMap();
+
+function collectibleCoordinates(values) {
+  if (!values || typeof values !== 'object') return [];
+  if (!(values instanceof Set)) return Array.from(values, (key) => String(key).split(',').map(Number));
+  const cached = coordinateCache.get(values);
+  if (cached?.size === values.size) return cached.coordinates;
+  const coordinates = Array.from(values, (key) => String(key).split(',').map(Number));
+  coordinateCache.set(values, { size: values.size, coordinates });
+  return coordinates;
+}
+
 export function drawCollectibles(context, { pellets = [], powerUps = [] }, tileSize, elapsed = 0) {
   context.fillStyle = '#f4c552';
-  for (const key of pellets) {
-    const [x, y] = String(key).split(',').map(Number); const size = (x + y) % 3 === 0 ? 4 : 3;
+  for (const [x, y] of collectibleCoordinates(pellets)) {
+    const size = (x + y) % 3 === 0 ? 4 : 3;
     context.fillRect(x * tileSize + (tileSize - size) / 2, y * tileSize + (tileSize - size) / 2, size, size);
   }
-  for (const key of powerUps) {
-    const [x, y] = String(key).split(',').map(Number); const px = x * tileSize + tileSize / 2; const py = y * tileSize + tileSize / 2;
+  for (const [x, y] of collectibleCoordinates(powerUps)) {
+    const px = x * tileSize + tileSize / 2; const py = y * tileSize + tileSize / 2;
     const glow = 0.55 + Math.sin(elapsed * 6) * 0.18; context.fillStyle = `rgba(76, 224, 179, ${glow})`;
     context.fillRect(px - 4, py - 2, 8, 7); context.fillRect(px - 6, py - 6, 3, 3); context.fillRect(px - 1, py - 8, 3, 3); context.fillRect(px + 4, py - 6, 3, 3);
   }

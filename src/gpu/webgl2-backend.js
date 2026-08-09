@@ -39,16 +39,20 @@ function createTexture(gl) {
   return { texture, width: 0, height: 0 };
 }
 
-function uploadCanvas(gl, record, source) {
+function uploadCanvas(gl, record, source, staticSource = false) {
   gl.bindTexture(gl.TEXTURE_2D, record.texture);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
   if (record.width !== source.width || record.height !== source.height) {
     record.width = source.width;
     record.height = source.height;
+    record.uploaded = false;
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, source.width, source.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   }
+  if (staticSource && record.uploaded) return 0;
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+  record.uploaded = true;
+  return source.width * source.height * 4;
 }
 
 export class WebGL2PresentationBackend {
@@ -96,11 +100,11 @@ export class WebGL2PresentationBackend {
     const gl = this.gl;
     if (this.contextLost || gl.isContextLost?.()) return;
     gl.activeTexture(gl.TEXTURE0);
-    uploadCanvas(gl, this.sceneTexture, scene);
+    const sceneBytes = uploadCanvas(gl, this.sceneTexture, scene);
     gl.activeTexture(gl.TEXTURE1);
     const overlaySource = hasOverlay ? overlay : this.emptyOverlay;
-    uploadCanvas(gl, this.overlayTexture, overlaySource);
-    this.uploadedBytes += (scene.width * scene.height + overlaySource.width * overlaySource.height) * 4;
+    const overlayBytes = uploadCanvas(gl, this.overlayTexture, overlaySource, !hasOverlay);
+    this.uploadedBytes += sceneBytes + overlayBytes;
 
     const viewportX = Math.round(camera.viewport.x * pixelRatio);
     const viewportWidth = Math.max(1, Math.round(camera.viewport.width * pixelRatio));
@@ -154,7 +158,7 @@ export function createWebGL2Backend(canvas, options = {}) {
     depth: false,
     stencil: false,
     desynchronized: options.desynchronized !== false,
-    powerPreference: options.powerPreference ?? 'low-power',
+    powerPreference: options.powerPreference ?? 'high-performance',
     preserveDrawingBuffer: false,
   });
   if (!context || typeof context.createShader !== 'function') return null;

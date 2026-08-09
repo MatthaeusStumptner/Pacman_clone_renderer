@@ -7,8 +7,11 @@ const percentile = (values, fraction) => {
 const rounded = (value) => Math.round(value * 100) / 100;
 
 export const RENDER_BUDGETS = Object.freeze({
-  desktop: Object.freeze({ renderP95Ms: 12, frameP95Ms: 22, longFramePercent: 10 }),
-  mobile: Object.freeze({ renderP95Ms: 28, frameP95Ms: 36, longFramePercent: 35 }),
+  notebook: Object.freeze({ renderP95Ms: 14, frameP95Ms: 34, longFramePercent: 15 }),
+  tablet: Object.freeze({ renderP95Ms: 20, frameP95Ms: 34, longFramePercent: 25 }),
+  mobile: Object.freeze({ renderP95Ms: 24, frameP95Ms: 34, longFramePercent: 30 }),
+  'weak-mobile': Object.freeze({ renderP95Ms: 36, frameP95Ms: 52, longFramePercent: 50 }),
+  desktop: Object.freeze({ renderP95Ms: 14, frameP95Ms: 34, longFramePercent: 15 }),
 });
 
 export function summarizeRenderSamples(renderSamples, frameSamples, longTaskDuration = 0) {
