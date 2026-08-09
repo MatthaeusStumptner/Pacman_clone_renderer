@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rendererPixelRatioLimit, resolvePostProcessProfile, resolveRendererQuality } from '../src/gpu/effect-profile.js';
+import { WEBGL_FRAGMENT_SHADER, WEBGPU_SHADER } from '../src/gpu/shaders.js';
 
 test('keeps modern notebooks, tablets and phones eligible for GPU effects', () => {
   assert.equal(resolveRendererQuality('auto', { deviceMemory: 2, hardwareConcurrency: 2 }), 'performance');
@@ -19,4 +20,11 @@ test('derives playful GPU effects from authored level edges', () => {
   const reduced = resolvePostProcessProfile({ theme: { edgeEffects: [{ type: 'stage-pulse', intensity: 1 }] } }, {}, { reducedMotion: true });
   assert.equal(reduced.mode, 'stage');
   assert.equal(reduced.motionScale, 0);
+});
+
+test('ships compatible GLSL and WGSL fragment entry points without WGSL swizzle writes', () => {
+  assert.match(WEBGL_FRAGMENT_SHADER, /void main\(\)/);
+  assert.match(WEBGPU_SHADER, /@fragment fn fragmentMain/);
+  assert.doesNotMatch(WEBGPU_SHADER, /color\.rgb\s*[+*]?=/);
+  assert.match(WEBGPU_SHADER, /var rgb = color\.rgb/);
 });

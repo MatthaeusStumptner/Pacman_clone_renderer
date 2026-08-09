@@ -148,35 +148,37 @@ fn effectUv(inputUv: vec2f) -> vec2f {
 @fragment fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let uv = effectUv(input.uv);
   let sceneUv = uniforms.source.xy + uv * uniforms.source.zw;
-  var color = textureSample(sceneTexture, nearestSampler, sceneUv);
+  let color = textureSample(sceneTexture, nearestSampler, sceneUv);
+  var rgb = color.rgb;
   let mode = uniforms.effect.y;
   let time = uniforms.effect.x * uniforms.effect.w;
   let intensity = uniforms.effect.z;
 
   if (mode > 5.5) {
     let shift = 0.0022 * intensity * (0.55 + sin(time * 3.1) * 0.25);
-    color.r = textureSample(sceneTexture, nearestSampler, uniforms.source.xy + clamp(uv + vec2f(shift, 0.0), vec2f(0.001), vec2f(0.999)) * uniforms.source.zw).r;
-    color.b = textureSample(sceneTexture, nearestSampler, uniforms.source.xy + clamp(uv - vec2f(shift, 0.0), vec2f(0.001), vec2f(0.999)) * uniforms.source.zw).b;
+    let shiftedRed = textureSample(sceneTexture, nearestSampler, uniforms.source.xy + clamp(uv + vec2f(shift, 0.0), vec2f(0.001), vec2f(0.999)) * uniforms.source.zw).r;
+    let shiftedBlue = textureSample(sceneTexture, nearestSampler, uniforms.source.xy + clamp(uv - vec2f(shift, 0.0), vec2f(0.001), vec2f(0.999)) * uniforms.source.zw).b;
+    rgb = vec3f(shiftedRed, rgb.g, shiftedBlue);
   }
 
-  color.rgb = mix(color.rgb, uniforms.tint.rgb, 0.025 + intensity * 0.045);
+  rgb = mix(rgb, uniforms.tint.rgb, 0.025 + intensity * 0.045);
   if (mode > 1.5 && mode < 2.5) {
     let fog = smoothstep(0.36, 1.0, hash21(floor((input.uv + time * 0.002) * 55.0))) * 0.055 * intensity;
-    color.rgb += uniforms.tint.rgb * fog;
+    rgb += uniforms.tint.rgb * fog;
   }
   if (mode > 2.5 && mode < 4.5) {
     let sparkle = step(0.993, hash21(floor(input.uv * vec2f(150.0, 90.0)) + floor(time * 2.0)));
-    color.rgb += uniforms.tint.rgb * sparkle * 0.16 * intensity;
+    rgb += uniforms.tint.rgb * sparkle * 0.16 * intensity;
   }
 
   let scanline = sin(input.position.y * 3.14159265) * 0.5 + 0.5;
-  color.rgb *= 1.0 - scanline * uniforms.feedback.w;
+  rgb *= 1.0 - scanline * uniforms.feedback.w;
   let vignette = smoothstep(0.36, 0.76, length(input.uv - vec2f(0.5)));
-  color.rgb *= 1.0 - vignette * uniforms.tint.a;
-  color.rgb = mix(color.rgb, color.rgb * 0.72 + vec3f(0.32, 0.95, 0.9) * 0.45, uniforms.feedback.x * (0.22 + sin(uniforms.effect.x * 9.0) * 0.06));
-  color.rgb = mix(color.rgb, vec3f(1.0, 0.14, 0.1), uniforms.feedback.y * 0.38);
+  rgb *= 1.0 - vignette * uniforms.tint.a;
+  rgb = mix(rgb, rgb * 0.72 + vec3f(0.32, 0.95, 0.9) * 0.45, uniforms.feedback.x * (0.22 + sin(uniforms.effect.x * 9.0) * 0.06));
+  rgb = mix(rgb, vec3f(1.0, 0.14, 0.1), uniforms.feedback.y * 0.38);
 
   let overlayUv = vec2f(input.position.x / uniforms.canvasSceneSize.x, input.position.y / uniforms.canvasSceneSize.y);
   let overlay = textureSample(overlayTexture, nearestSampler, overlayUv);
-  return vec4f(mix(color.rgb, overlay.rgb, overlay.a), 1.0);
+  return vec4f(mix(rgb, overlay.rgb, overlay.a), 1.0);
 }`;
