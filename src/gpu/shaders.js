@@ -13,7 +13,9 @@ export const WEBGL_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 uniform sampler2D u_scene;
 uniform sampler2D u_overlay;
+uniform sampler2D u_world_overlay;
 uniform vec4 u_source;
+uniform vec4 u_world_source;
 uniform vec2 u_canvas_size;
 uniform vec4 u_effect;
 uniform vec4 u_tint;
@@ -85,6 +87,9 @@ void main() {
   color.rgb = mix(color.rgb, color.rgb * 0.72 + vec3(0.32, 0.95, 0.9) * 0.45, power * (0.22 + sin(u_effect.x * 9.0) * 0.06));
   color.rgb = mix(color.rgb, vec3(1.0, 0.14, 0.1), hit * 0.38);
 
+  vec2 world_overlay_uv = u_world_source.xy + v_uv * u_world_source.zw;
+  vec4 world_overlay = texture(u_world_overlay, world_overlay_uv);
+  color.rgb = mix(color.rgb, world_overlay.rgb, world_overlay.a);
   vec2 overlay_uv = vec2(gl_FragCoord.x / u_canvas_size.x, gl_FragCoord.y / u_canvas_size.y);
   vec4 overlay = texture(u_overlay, overlay_uv);
   out_color = vec4(mix(color.rgb, overlay.rgb, overlay.a), 1.0);
@@ -93,6 +98,7 @@ void main() {
 export const WEBGPU_SHADER = `
 struct Uniforms {
   source: vec4f,
+  worldSource: vec4f,
   canvasSceneSize: vec4f,
   effect: vec4f,
   tint: vec4f,
@@ -103,6 +109,7 @@ struct Uniforms {
 @group(0) @binding(1) var overlayTexture: texture_2d<f32>;
 @group(0) @binding(2) var nearestSampler: sampler;
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
+@group(0) @binding(4) var worldOverlayTexture: texture_2d<f32>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -180,6 +187,9 @@ fn effectUv(inputUv: vec2f) -> vec2f {
   rgb = mix(rgb, rgb * 0.72 + vec3f(0.32, 0.95, 0.9) * 0.45, uniforms.feedback.x * (0.22 + sin(uniforms.effect.x * 9.0) * 0.06));
   rgb = mix(rgb, vec3f(1.0, 0.14, 0.1), uniforms.feedback.y * 0.38);
 
+  let worldOverlayUv = uniforms.worldSource.xy + input.uv * uniforms.worldSource.zw;
+  let worldOverlay = textureSample(worldOverlayTexture, nearestSampler, worldOverlayUv);
+  rgb = mix(rgb, worldOverlay.rgb, worldOverlay.a);
   let overlayUv = vec2f(input.position.x / uniforms.canvasSceneSize.x, input.position.y / uniforms.canvasSceneSize.y);
   let overlay = textureSample(overlayTexture, nearestSampler, overlayUv);
   return vec4f(mix(rgb, overlay.rgb, overlay.a), 1.0);

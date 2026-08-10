@@ -37,7 +37,8 @@ test('actor previews use the same custom appearance painter as the game', () => 
     stateAnimations: { right: 'right' },
   } };
   assert.equal(drawActorPreview(context, actor, { left: 0, top: 0, width: 80, height: 50 }, { state: 'right', elapsed: 0.25 }), true);
-  assert.equal(context.fills.length, 4);
+  assert.equal(context.fills.length, 2);
+  assert.deepEqual(context.fills.map((fill) => fill.slice(2)), [[56, 28], [56, 28]]);
 });
 
 test('actor previews render the gameplay fallback for cats without custom sprites', () => {

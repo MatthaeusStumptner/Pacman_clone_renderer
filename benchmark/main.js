@@ -14,7 +14,7 @@ const backendLabel = document.querySelector('#backend');
 function benchmarkLevel() {
   const walls = [];
   for (let x = 2; x < 23; x += 4) walls.push({ x, y: 3 + x % 7, width: 2, height: 4 + x % 5 });
-  const decorations = Array.from({ length: 48 }, (_, index) => ({
+  const decorations = [...Array.from({ length: 48 }, (_, index) => ({
     id: `decoration-${index}`,
     type: index % 4 === 0 ? 'lamp' : index % 4 === 1 ? 'tree' : index % 4 === 2 ? 'bench' : 'water',
     x: 1 + index * 7 % 23,
@@ -23,7 +23,15 @@ function benchmarkLevel() {
     height: 1,
     color: index % 3 === 0 ? '#55d9dd' : '#6fdb9e',
     animation: { type: index % 2 ? 'pulse' : 'float', speed: 0.8 + index % 5 * 0.15, amplitude: 0.14 },
-  }));
+  })), {
+    id: 'benchmark-text-primary', type: 'text', x: 7, y: 5, width: 10, height: 2, color: '#f7e7ba',
+    content: { standard: 'FRANZ & LOLA', dialect: 'DA FRANZ & D LOLA' },
+    textStyle: { fontSize: 0.85, backgroundOpacity: 0, borderOpacity: 0 },
+  }, {
+    id: 'benchmark-text-secondary', type: 'text', x: 15, y: 18, width: 8, height: 2, color: '#7de3ff',
+    content: { standard: 'Gutti voraus!', dialect: 'Do gibt’s a Gutti!' },
+    textStyle: { fontSize: 0.72, backgroundOpacity: 0, borderOpacity: 0 },
+  }];
   return createLevelDocument({
     id: 'zauberberg',
     board: { columns: 25, rows: 25, tileSize: 24, tunnelRows: [12], walls },
@@ -73,7 +81,7 @@ async function run() {
     const player = { x: 12 + Math.sin(elapsed * 0.85) * 7.5, y: 12 + Math.cos(elapsed * 0.63) * 7.5, direction: { name: 'right', x: 1, y: 0 }, effects: level.actors.player.effects };
     const cats = level.actors.cats.map((cat, index) => ({ ...cat, x: cat.x + Math.sin(elapsed * (0.7 + index * 0.04)) * 2.5, y: cat.y + Math.cos(elapsed * (0.6 + index * 0.05)) * 2 }));
     const decorations = scene === 'cutscene'
-      ? level.decorations.map((item, index) => ({ ...item, x: item.x + Math.sin(elapsed * 0.7 + index) * 0.35 }))
+      ? level.decorations.map((item, index) => item.type === 'text' ? item : { ...item, x: item.x + Math.sin(elapsed * 0.7 + index) * 0.35 })
       : undefined;
     const started = performance.now();
     const result = renderer.render({ level, player, cats, decorations, pellets, powerUps, elapsed, powerTimer: Math.sin(elapsed * 0.5) > 0.78 ? 3 : 0, hitTimer: 0 }, { cameraEnabled: true, quality, reducedMotion: false });
@@ -103,6 +111,13 @@ async function run() {
     scene,
     pixelRatio: info.pixelRatio,
     uploadedMegabytes: Math.round((info.uploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
+    sceneUploadedMegabytes: Math.round((info.sceneUploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
+    overlayUploadedMegabytes: Math.round((info.overlayUploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
+    worldOverlayUploadedMegabytes: Math.round((info.worldOverlayUploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
+    textureReallocations: info.textureReallocations ?? 0,
+    gpuCropResizes: info.gpuCropResizes ?? 0,
+    overlayUploadSkips: info.overlayUploadSkips ?? 0,
+    worldOverlayUploadSkips: info.worldOverlayUploadSkips ?? 0,
     ...summary,
     budget,
   });
