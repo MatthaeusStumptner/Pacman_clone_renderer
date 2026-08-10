@@ -1,4 +1,4 @@
-import { calculateCamera, projectWorldPoint, visibleWorldBounds } from './camera.js';
+import { calculateCamera, projectWorldPoint, snapCameraToTexels, visibleWorldBounds } from './camera.js';
 import { compileWallGrid, createLevelDocument } from './level-format.js';
 import { drawCat, drawWalker } from './painters/characters.js';
 import { drawCollectibles, drawEasterEggs } from './painters/collectibles.js';
@@ -116,7 +116,8 @@ export class PassauPixelRenderer {
     }
     const display = this.resize(); const viewport = options.viewport ?? { x: 0, y: 0, width: display.width, height: display.height };
     const cameraTarget = options.cameraTarget ?? { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 };
-    const camera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
+    const calculatedCamera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
+    const camera = snapCameraToTexels(calculatedCamera, this.sceneScale, worldWidth, worldHeight);
     const renderLanguage = options.language ?? 'standard';
     const worldTextOverlay = this.prepareWorldText(renderLevel, renderLanguage);
     this.overlayContext.setTransform(1, 0, 0, 1, 0, 0); this.overlayContext.clearRect(0, 0, this.overlay.width, this.overlay.height);

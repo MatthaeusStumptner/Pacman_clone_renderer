@@ -22,6 +22,7 @@ export {
 export {
   calculateCamera,
   projectWorldPoint,
+  snapCameraToTexels,
   visibleWorldBounds,
 } from './camera.js';
 

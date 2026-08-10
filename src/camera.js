@@ -52,6 +52,16 @@ export function calculateCamera({
   };
 }
 
+export function snapCameraToTexels(camera, sceneScale = 1, worldWidth, worldHeight) {
+  const scale = positive(sceneScale, 1);
+  const step = 1 / scale;
+  const maximumX = positive(worldWidth, camera.source.width);
+  const maximumY = positive(worldHeight, camera.source.height);
+  const snappedX = clamp(Math.round(camera.source.x / step) * step, 0, maximumX - camera.source.width);
+  const snappedY = clamp(Math.round(camera.source.y / step) * step, 0, maximumY - camera.source.height);
+  return { ...camera, source: { ...camera.source, x: snappedX, y: snappedY } };
+}
+
 export function projectWorldPoint(camera, point) {
   const { source } = camera;
   const { viewport } = camera;
