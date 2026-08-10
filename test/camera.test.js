@@ -42,3 +42,15 @@ test('keeps snapped cameras inside the world at every edge', () => {
   assert.ok(snapped.source.x + snapped.source.width <= 600);
   assert.ok(snapped.source.y + snapped.source.height <= 600);
 });
+test('keeps edge-snapped cameras aligned at Canvas2D scene scales', () => {
+  const camera = calculateCamera({ worldWidth: 600, worldHeight: 600, viewport: { x: 0, y: 0, width: 390, height: 844 }, target: { x: 599.9, y: 599.9 }, zoom: 1.12 });
+  for (const sceneScale of [1.5, 2]) {
+    const snapped = snapCameraToTexels(camera, sceneScale, 600, 600);
+    assert.equal(snapped.source.x * sceneScale, Math.round(snapped.source.x * sceneScale));
+    assert.equal(snapped.source.y * sceneScale, Math.round(snapped.source.y * sceneScale));
+    assert.ok(snapped.source.x >= 0);
+    assert.ok(snapped.source.y >= 0);
+    assert.ok(snapped.source.x + snapped.source.width <= 600);
+    assert.ok(snapped.source.y + snapped.source.height <= 600);
+  }
+});
