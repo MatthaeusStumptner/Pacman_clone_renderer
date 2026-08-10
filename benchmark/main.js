@@ -10,6 +10,7 @@ const frameTarget = Math.max(60, Math.min(900, Number(parameters.get('frames')) 
 const canvas = document.querySelector('#benchmark');
 const output = document.querySelector('#result');
 const backendLabel = document.querySelector('#backend');
+const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
 
 function benchmarkLevel() {
   const walls = [];
@@ -84,7 +85,7 @@ async function run() {
       ? level.decorations.map((item, index) => item.type === 'text' ? item : { ...item, x: item.x + Math.sin(elapsed * 0.7 + index) * 0.35 })
       : undefined;
     const started = performance.now();
-    const result = renderer.render({ level, player, cats, decorations, pellets, powerUps, elapsed, powerTimer: Math.sin(elapsed * 0.5) > 0.78 ? 3 : 0, hitTimer: 0 }, { cameraEnabled: true, quality, reducedMotion: false });
+    const result = renderer.render({ level, player, cats, decorations, pellets, powerUps, elapsed, powerTimer: Math.sin(elapsed * 0.5) > 0.78 ? 3 : 0, hitTimer: 0 }, { cameraEnabled: true, quality, reducedMotion });
     if (measured) renderSamples.push(performance.now() - started);
     return result.renderer;
   };
@@ -105,11 +106,15 @@ async function run() {
     requestedBackend,
     resolvedBackend: info.backend,
     fallback: requestedBackend !== 'auto' && requestedBackend !== info.backend,
+    fallbackReason: info.fallbackReason,
     autoSelected: requestedBackend === 'auto' ? info.backend : null,
     quality: info.quality,
     profile: profileName,
     scene,
+    reducedMotion,
     pixelRatio: info.pixelRatio,
+    renderer: info,
+    postProcess: info.postProcess,
     uploadedMegabytes: Math.round((info.uploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
     sceneUploadedMegabytes: Math.round((info.sceneUploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
     overlayUploadedMegabytes: Math.round((info.overlayUploadedBytes ?? 0) / 1024 / 1024 * 10) / 10,
@@ -121,9 +126,11 @@ async function run() {
     ...summary,
     budget,
   });
-  backendLabel.textContent = `${result.resolvedBackend.toUpperCase()} · ${quality.toUpperCase()}`;
+  canvas.dataset.rendererBackend = result.resolvedBackend;
+  backendLabel.textContent = `${result.resolvedBackend.toUpperCase()} · ${result.quality.toUpperCase()}`;
   output.textContent = JSON.stringify(result, null, 2);
   document.documentElement.dataset.benchmark = budget.passed ? 'passed' : 'failed';
+  window.__RENDER_BENCHMARK_RESULT__ = result;
   return result;
 }
 

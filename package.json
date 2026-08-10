@@ -18,7 +18,9 @@
     "build": "vite build",
     "test": "node --test",
     "benchmark": "node scripts/render-benchmark.mjs",
-    "benchmark:assert": "node scripts/render-benchmark.mjs --assert"
+    "benchmark:assert": "node scripts/render-benchmark.mjs --assert",
+    "test:browser": "node scripts/browser-regression.mjs",
+    "verify": "npm test && npm run build && npm run benchmark:assert && npm run test:browser"
   },
   "devDependencies": {
     "playwright": "^1.54.2",
