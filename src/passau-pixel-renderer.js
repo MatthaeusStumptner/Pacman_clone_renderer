@@ -9,6 +9,14 @@ import { resolveStableCropSize } from './gpu/crop-buffer.js';
 import { createPresentationBackend, createSyncPresentationBackend } from './gpu/presentation-backend.js';
 
 const clampRatio = (value, maximum = 2) => Math.min(maximum, Math.max(1, Number(value) || 1));
+const normalizeDisplayDimension = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(1, numeric) : 1;
+};
+const normalizeBufferDimension = (value) => {
+  const rounded = Math.round(value);
+  return Number.isFinite(rounded) ? Math.max(1, rounded) : 1;
+};
 const interpolate = (entity, alpha) => ({ ...entity, x: Number.isFinite(entity.previousX) ? entity.previousX + (entity.x - entity.previousX) * alpha : entity.x, y: Number.isFinite(entity.previousY) ? entity.previousY + (entity.y - entity.previousY) * alpha : entity.y });
 const actorScale = (actor) => Math.max(0.5, Math.min(4, Number(actor?.scale) || 1));
 const isDynamicText = (item) => item.type === 'text'
@@ -76,12 +84,12 @@ export class PassauPixelRenderer {
   resize(metrics) {
     const legacy = !metrics;
     const bounds = legacy ? this.canvas.getBoundingClientRect() : metrics;
-    const width = Math.max(1, Number(legacy ? bounds.width || this.canvas.clientWidth : bounds.width) || 1);
-    const height = Math.max(1, Number(legacy ? bounds.height || this.canvas.clientHeight : bounds.height) || 1);
+    const width = normalizeDisplayDimension(legacy ? bounds.width || this.canvas.clientWidth : bounds.width);
+    const height = normalizeDisplayDimension(legacy ? bounds.height || this.canvas.clientHeight : bounds.height);
     const actualPixelRatio = Math.max(1, Number(metrics?.devicePixelRatio ?? globalThis.devicePixelRatio ?? this.pixelRatio) || 1);
     const pixelRatio = clampRatio(actualPixelRatio, this.pixelRatioLimit);
-    const bufferWidth = Math.max(1, Math.round(width * pixelRatio));
-    const bufferHeight = Math.max(1, Math.round(height * pixelRatio));
+    const bufferWidth = normalizeBufferDimension(width * pixelRatio);
+    const bufferHeight = normalizeBufferDimension(height * pixelRatio);
     const changed = !this.displayMetrics || this.displayMetrics.bufferWidth !== bufferWidth || this.displayMetrics.bufferHeight !== bufferHeight;
     if (changed) this.presentation.resize(bufferWidth, bufferHeight);
     if (this.overlay.width !== bufferWidth) this.overlay.width = bufferWidth; if (this.overlay.height !== bufferHeight) this.overlay.height = bufferHeight;

@@ -27,7 +27,8 @@ function fakeCanvas({ width = 0, height = 0, onLayoutRead, onClientSizeRead } = 
 function fakePresentationBackend() {
   return {
     kind: 'canvas2d', resizeCalls: 0,
-    resize() { this.resizeCalls += 1; },
+    resizeArguments: [],
+    resize(width, height) { this.resizeCalls += 1; this.resizeArguments.push([width, height]); },
     present() {},
     snapshot: () => ({ backend: 'canvas2d' }),
   };
@@ -84,6 +85,15 @@ test('normalizes zero externally measured display metrics without reading client
     width: 1, height: 1, pixelRatio: 2, bufferWidth: 2, bufferHeight: 2, changed: true, reason: 'hidden',
   });
   assert.equal(clientSizeReads, 0);
+});
+
+test('normalizes non-finite externally measured dimensions before backend resize', () => {
+  const backend = fakePresentationBackend();
+  const renderer = new PassauPixelRenderer(fakeCanvas(), { presentationBackend: backend });
+  assert.deepEqual(renderer.resize({ width: Infinity, height: -Infinity, devicePixelRatio: 2, reason: 'observer' }), {
+    width: 1, height: 1, pixelRatio: 2, bufferWidth: 2, bufferHeight: 2, changed: true, reason: 'observer',
+  });
+  assert.deepEqual(backend.resizeArguments, [[2, 2]]);
 });
 
 function previewContext() {
