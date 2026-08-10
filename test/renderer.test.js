@@ -129,6 +129,26 @@ test('normalizes non-finite externally measured dimensions before backend resize
   assert.deepEqual(backend.resizeArguments, [[2, 2]]);
 });
 
+test('reports the requested backend, selected backend, and fallback reason', async () => {
+  const canvas = fakeCanvas();
+  const renderer = await PassauPixelRenderer.create(canvas, { backend: 'webgl2' });
+
+  assert.deepEqual(renderer.rendererInfo(), {
+    requestedBackend: 'webgl2',
+    backend: 'canvas2d',
+    fallbackReason: 'WebGL 2 ist auf diesem Gerät nicht verfügbar.',
+    frameCount: 0,
+    gpuAccelerated: false,
+    contextLost: false,
+    quality: 'quality',
+    pixelRatio: 1,
+    display: null,
+    gpuCropResizes: 0,
+    staticWorldBuilds: 0,
+    postProcess: null,
+  });
+});
+
 test('reuses the retained static world until its revision changes', () => {
   const renderer = createTestRenderer();
   const level = sampleLevel();

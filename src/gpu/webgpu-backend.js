@@ -240,27 +240,42 @@ export class WebGPUPresentationBackend {
   }
 }
 
+export function webGPUAdapterOptions(options = {}, environment = globalThis.navigator) {
+  const platform = environment?.userAgentData?.platform ?? environment?.platform ?? '';
+  if (/windows/i.test(platform)) return {};
+  return options.powerPreference ? { powerPreference: options.powerPreference } : {};
+}
+
 async function initializeWebGPU(canvas, options = {}) {
   const gpu = options.gpu ?? globalThis.navigator?.gpu;
   if (!gpu) return null;
-  const adapter = options.adapter ?? await gpu.requestAdapter({ powerPreference: options.powerPreference ?? 'high-performance' });
+  const adapter = options.adapter ?? await gpu.requestAdapter(webGPUAdapterOptions(options));
   if (!adapter) return null;
-  const device = await adapter.requestDevice();
-  const module = device.createShaderModule({ code: WEBGPU_SHADER });
-  const compilation = await module.getCompilationInfo?.();
-  const errors = compilation?.messages?.filter((message) => message.type === 'error') ?? [];
-  if (errors.length) throw new Error(errors.map((error) => error.message).join('\n'));
-  const format = gpu.getPreferredCanvasFormat();
-  const pipeline = await device.createRenderPipelineAsync({
-    layout: 'auto',
-    vertex: { module, entryPoint: 'vertexMain' },
-    fragment: { module, entryPoint: 'fragmentMain', targets: [{ format }] },
-    primitive: { topology: 'triangle-list' },
-  });
-  const context = canvas.getContext('webgpu');
-  if (!context) return null;
-  context.configure({ device, format, alphaMode: 'opaque' });
-  return { gpu, adapter, device, context, format, pipeline };
+  let device;
+  try {
+    device = await adapter.requestDevice();
+    const module = device.createShaderModule({ code: WEBGPU_SHADER });
+    const compilation = await module.getCompilationInfo?.();
+    const errors = compilation?.messages?.filter((message) => message.type === 'error') ?? [];
+    if (errors.length) throw new Error(errors.map((error) => error.message).join('\n'));
+    const format = gpu.getPreferredCanvasFormat();
+    const pipeline = await device.createRenderPipelineAsync({
+      layout: 'auto',
+      vertex: { module, entryPoint: 'vertexMain' },
+      fragment: { module, entryPoint: 'fragmentMain', targets: [{ format }] },
+      primitive: { topology: 'triangle-list' },
+    });
+    const context = canvas.getContext('webgpu');
+    if (!context) {
+      device.destroy();
+      return null;
+    }
+    context.configure({ device, format, alphaMode: 'opaque' });
+    return { gpu, adapter, device, context, format, pipeline };
+  } catch (error) {
+    device?.destroy();
+    throw error;
+  }
 }
 
 export async function createWebGPUBackend(canvas, options = {}) {
