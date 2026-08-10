@@ -18,6 +18,7 @@ export class WebGPUPresentationBackend {
     this.overlayUploadedBytes = 0;
     this.worldOverlayUploadedBytes = 0;
     this.textureReallocations = 0;
+    this.sceneUploadSkips = 0;
     this.overlayUploadSkips = 0;
     this.worldOverlayUploadSkips = 0;
     this.uniforms = new Float32Array(UNIFORM_FLOATS);
@@ -82,6 +83,7 @@ export class WebGPUPresentationBackend {
         width: scene.width,
         height: scene.height,
         texture: this.device.createTexture({ size: [scene.width, scene.height], format: 'rgba8unorm', usage }),
+        uploaded: false,
       };
       this.textureReallocations += 1;
       changed = true;
@@ -121,13 +123,19 @@ export class WebGPUPresentationBackend {
     });
   }
 
-  present({ scene, overlay, hasOverlay = true, overlayChanged = true, worldOverlay, hasWorldOverlay = false, worldOverlayChanged = true, camera, worldCamera = camera, pixelRatio, profile, elapsed = 0, sceneScale = 2, worldOverlayScale = 2 }) {
+  present({ scene, sceneChanged = true, overlay, hasOverlay = true, overlayChanged = true, worldOverlay, hasWorldOverlay = false, worldOverlayChanged = true, camera, worldCamera = camera, pixelRatio, profile, elapsed = 0, sceneScale = 2, worldOverlayScale = 2 }) {
     if (this.contextLost) return;
     const overlaySource = hasOverlay ? overlay : this.emptyOverlay;
     const worldOverlaySource = hasWorldOverlay ? worldOverlay : this.emptyOverlay;
     this.ensureTextures(scene, overlaySource, worldOverlaySource);
-    this.device.queue.copyExternalImageToTexture({ source: scene }, { texture: this.sceneTexture.texture }, [scene.width, scene.height]);
-    const sceneBytes = scene.width * scene.height * 4;
+    let sceneBytes = 0;
+    if (sceneChanged || !this.sceneTexture.uploaded) {
+      this.device.queue.copyExternalImageToTexture({ source: scene }, { texture: this.sceneTexture.texture }, [scene.width, scene.height]);
+      this.sceneTexture.uploaded = true;
+      sceneBytes = scene.width * scene.height * 4;
+    } else {
+      this.sceneUploadSkips += 1;
+    }
     let overlayBytes = 0;
     if (overlayChanged || !this.overlayTexture.uploaded) {
       this.device.queue.copyExternalImageToTexture({ source: overlaySource }, { texture: this.overlayTexture.texture }, [overlaySource.width, overlaySource.height]);
@@ -216,6 +224,7 @@ export class WebGPUPresentationBackend {
       overlayUploadedBytes: this.overlayUploadedBytes,
       worldOverlayUploadedBytes: this.worldOverlayUploadedBytes,
       textureReallocations: this.textureReallocations,
+      sceneUploadSkips: this.sceneUploadSkips,
       overlayUploadSkips: this.overlayUploadSkips,
       worldOverlayUploadSkips: this.worldOverlayUploadSkips,
     };

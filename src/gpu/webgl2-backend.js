@@ -29,29 +29,35 @@ function createProgram(gl) {
   return program;
 }
 
-function createTexture(gl) {
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
+function createTexture() {
+  return { texture: null, width: 0, height: 0, uploaded: false };
+}
+
+function allocateTexture(gl, record, width, height) {
+  if (record.texture) gl.deleteTexture(record.texture);
+  record.texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, record.texture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  return { texture, width: 0, height: 0 };
+  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, width, height);
+  record.width = width;
+  record.height = height;
+  record.uploaded = false;
 }
 
-function uploadCanvas(gl, record, source, staticSource = false) {
-  gl.bindTexture(gl.TEXTURE_2D, record.texture);
+function uploadCanvas(gl, record, source, changed = true) {
+  let reallocated = false;
+  if (!record.texture || record.width !== source.width || record.height !== source.height) {
+    allocateTexture(gl, record, source.width, source.height);
+    reallocated = true;
+  } else {
+    gl.bindTexture(gl.TEXTURE_2D, record.texture);
+  }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-  let reallocated = false;
-  if (record.width !== source.width || record.height !== source.height) {
-    record.width = source.width;
-    record.height = source.height;
-    record.uploaded = false;
-    reallocated = true;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, source.width, source.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  }
-  if (staticSource && record.uploaded) return { bytes: 0, reallocated };
+  if (!changed && record.uploaded) return { bytes: 0, reallocated };
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
   record.uploaded = true;
   return { bytes: source.width * source.height * 4, reallocated };
@@ -68,6 +74,7 @@ export class WebGL2PresentationBackend {
     this.overlayUploadedBytes = 0;
     this.worldOverlayUploadedBytes = 0;
     this.textureReallocations = 0;
+    this.sceneUploadSkips = 0;
     this.overlayUploadSkips = 0;
     this.worldOverlayUploadSkips = 0;
     this.contextLost = false;
@@ -110,22 +117,23 @@ export class WebGL2PresentationBackend {
     if (this.canvas.height !== height) this.canvas.height = height;
   }
 
-  present({ scene, overlay, hasOverlay = true, overlayChanged = true, worldOverlay, hasWorldOverlay = false, worldOverlayChanged = true, camera, worldCamera = camera, pixelRatio, profile, elapsed = 0, sceneScale = 2, worldOverlayScale = 2 }) {
+  present({ scene, sceneChanged = true, overlay, hasOverlay = true, overlayChanged = true, worldOverlay, hasWorldOverlay = false, worldOverlayChanged = true, camera, worldCamera = camera, pixelRatio, profile, elapsed = 0, sceneScale = 2, worldOverlayScale = 2 }) {
     const gl = this.gl;
     if (this.contextLost || gl.isContextLost?.()) return;
     gl.activeTexture(gl.TEXTURE0);
-    const sceneUpload = uploadCanvas(gl, this.sceneTexture, scene);
+    const sceneUpload = uploadCanvas(gl, this.sceneTexture, scene, sceneChanged);
     gl.activeTexture(gl.TEXTURE1);
     const overlaySource = hasOverlay ? overlay : this.emptyOverlay;
-    const overlayUpload = uploadCanvas(gl, this.overlayTexture, overlaySource, !overlayChanged);
+    const overlayUpload = uploadCanvas(gl, this.overlayTexture, overlaySource, overlayChanged);
     gl.activeTexture(gl.TEXTURE2);
     const worldOverlaySource = hasWorldOverlay ? worldOverlay : this.emptyOverlay;
-    const worldOverlayUpload = uploadCanvas(gl, this.worldOverlayTexture, worldOverlaySource, !worldOverlayChanged);
+    const worldOverlayUpload = uploadCanvas(gl, this.worldOverlayTexture, worldOverlaySource, worldOverlayChanged);
     this.sceneUploadedBytes += sceneUpload.bytes;
     this.overlayUploadedBytes += overlayUpload.bytes;
     this.worldOverlayUploadedBytes += worldOverlayUpload.bytes;
     this.uploadedBytes += sceneUpload.bytes + overlayUpload.bytes + worldOverlayUpload.bytes;
     this.textureReallocations += Number(sceneUpload.reallocated) + Number(overlayUpload.reallocated) + Number(worldOverlayUpload.reallocated);
+    if (!sceneChanged && sceneUpload.bytes === 0) this.sceneUploadSkips += 1;
     if (!overlayChanged && overlayUpload.bytes === 0) this.overlayUploadSkips += 1;
     if (!worldOverlayChanged && worldOverlayUpload.bytes === 0) this.worldOverlayUploadSkips += 1;
 
@@ -176,6 +184,7 @@ export class WebGL2PresentationBackend {
       overlayUploadedBytes: this.overlayUploadedBytes,
       worldOverlayUploadedBytes: this.worldOverlayUploadedBytes,
       textureReallocations: this.textureReallocations,
+      sceneUploadSkips: this.sceneUploadSkips,
       overlayUploadSkips: this.overlayUploadSkips,
       worldOverlayUploadSkips: this.worldOverlayUploadSkips,
     };

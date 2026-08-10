@@ -2,7 +2,7 @@ import { calculateCamera, projectWorldPoint, snapCameraToTexels, visibleWorldBou
 import { compileWallGrid, createLevelDocument } from './level-format.js';
 import { drawCat, drawWalker } from './painters/characters.js';
 import { drawCollectibles, drawEasterEggs } from './painters/collectibles.js';
-import { drawDecoration, drawDecorations, drawEditorGrid, drawEnvironment } from './painters/environment.js';
+import { drawDecoration, drawEditorGrid, drawEnvironment } from './painters/environment.js';
 import { drawWithVisualEffects } from './visual-effects.js';
 import { resolvePostProcessProfile, resolveRendererQuality, rendererPixelRatioLimit } from './gpu/effect-profile.js';
 import { resolveStableCropSize } from './gpu/crop-buffer.js';
@@ -21,6 +21,10 @@ const interpolate = (entity, alpha) => ({ ...entity, x: Number.isFinite(entity.p
 const actorScale = (actor) => Math.max(0.5, Math.min(4, Number(actor?.scale) || 1));
 const isDynamicText = (item) => item.type === 'text'
   && Boolean((item.animation?.type && item.animation.type !== 'none') || item.effects?.length);
+const isStaticWorldDecoration = (item) => item.type !== 'text'
+  && (!item.animation?.type || item.animation.type === 'none')
+  && !item.effects?.length;
+const collectionSize = (items) => items?.size ?? items?.length ?? 0;
 
 function drawScaledActor(context, actor, tileSize, draw) {
   const scale = actorScale(actor);
@@ -56,6 +60,9 @@ export class PassauPixelRenderer {
     this.scene = this.document.createElement('canvas'); this.sceneContext = this.scene.getContext('2d');
     this.environment = this.document.createElement('canvas'); this.environmentContext = this.environment.getContext('2d');
     this.environmentCache = { board: null, theme: null, language: '', frame: -1 };
+    this.staticWorld = this.document.createElement('canvas'); this.staticWorldContext = this.staticWorld.getContext('2d');
+    this.staticWorldCache = { key: '', pellets: null, pelletSize: -1, decorations: null };
+    this.staticWorldBuilds = 0;
     this.gpuScene = this.presentation.kind === 'canvas2d' ? null : this.document.createElement('canvas');
     this.gpuSceneContext = this.gpuScene?.getContext('2d') ?? null;
     this.overlay = this.document.createElement('canvas'); this.overlayContext = this.overlay.getContext('2d');
@@ -74,8 +81,10 @@ export class PassauPixelRenderer {
     const width = this.level.board.columns * this.level.board.tileSize; const height = this.level.board.rows * this.level.board.tileSize;
     this.scene.width = Math.round(width * this.sceneScale); this.scene.height = Math.round(height * this.sceneScale); this.sceneContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.sceneContext.imageSmoothingEnabled = false;
     this.environment.width = this.scene.width; this.environment.height = this.scene.height; this.environmentContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.environmentContext.imageSmoothingEnabled = false;
+    this.staticWorld.width = this.scene.width; this.staticWorld.height = this.scene.height; this.staticWorldContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.staticWorldContext.imageSmoothingEnabled = false;
     this.worldOverlay.width = Math.round(width * this.worldOverlayScale); this.worldOverlay.height = Math.round(height * this.worldOverlayScale); this.worldOverlayContext.setTransform(this.worldOverlayScale, 0, 0, this.worldOverlayScale, 0, 0); this.worldOverlayContext.imageSmoothingEnabled = false;
     this.environmentCache = { board: null, theme: null, language: '', frame: -1 };
+    this.staticWorldCache = { key: '', pellets: null, pelletSize: -1, decorations: null };
     this.worldOverlayCache = { language: '', items: [], hasOverlay: false };
     this.overlayCache.decorations = null;
     return this.level;
@@ -106,13 +115,16 @@ export class PassauPixelRenderer {
     const cats = (snapshot.cats ?? level.actors.cats).map((cat, index) => interpolate({ ...(level.actors.cats[index] ?? {}), ...cat }, alpha)); const elapsed = Number(snapshot.elapsed) || 0;
     const characters = (snapshot.characters ?? level.actors.characters ?? []).map((character, index) => interpolate({ ...(level.actors.characters?.[index] ?? {}), ...character }, alpha));
     const renderLevel = snapshot.decorations ? { ...level, decorations: snapshot.decorations } : level;
+    const renderLanguage = options.language ?? 'standard';
     const worldWidth = level.board.columns * level.board.tileSize; const worldHeight = level.board.rows * level.board.tileSize; const scene = this.sceneContext;
     scene.clearRect(0, 0, worldWidth, worldHeight);
-    this.prepareEnvironment(renderLevel, elapsed, options.language ?? 'standard');
-    scene.save(); scene.setTransform(1, 0, 0, 1, 0, 0); scene.drawImage(this.environment, 0, 0); scene.restore();
-    drawDecorations(scene, renderLevel, elapsed, options.language ?? 'standard', { excludeText: true });
+    this.prepareStaticWorld(renderLevel, snapshot.pellets, elapsed, renderLanguage, options.staticRevision);
+    scene.save(); scene.setTransform(1, 0, 0, 1, 0, 0); scene.drawImage(this.staticWorld, 0, 0); scene.restore();
+    renderLevel.decorations.forEach((item) => {
+      if (item.type !== 'text' && !isStaticWorldDecoration(item)) drawDecoration(scene, item, level.board.tileSize, elapsed, renderLanguage);
+    });
+    drawCollectibles(scene, { powerUps: snapshot.powerUps }, level.board.tileSize, elapsed);
     drawEasterEggs(scene, renderLevel, snapshot.levelEvents ?? (level.events?.length ? { unlocked: snapshot.unlockedEvents, active: snapshot.activeEventId, showAll: Boolean(options.editor?.showEvents), showZones: Boolean(options.editor?.showEventZones) } : snapshot.easterEggs), elapsed);
-    drawCollectibles(scene, { pellets: snapshot.pellets, powerUps: snapshot.powerUps }, level.board.tileSize, elapsed);
     cats.forEach((cat) => {
       if ((cat.respawnTimer ?? 0) > 0) return;
       drawWithVisualEffects(scene, cat.effects, { left: cat.x * level.board.tileSize, top: cat.y * level.board.tileSize, width: level.board.tileSize, height: level.board.tileSize }, elapsed,
@@ -135,7 +147,6 @@ export class PassauPixelRenderer {
     const cameraTarget = options.cameraTarget ?? { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 };
     const calculatedCamera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
     const camera = snapCameraToTexels(calculatedCamera, this.sceneScale, worldWidth, worldHeight);
-    const renderLanguage = options.language ?? 'standard';
     const worldTextOverlay = this.prepareWorldText(renderLevel, renderLanguage);
     this.overlayContext.setTransform(1, 0, 0, 1, 0, 0); this.overlayContext.clearRect(0, 0, this.overlay.width, this.overlay.height);
     const textOverlay = this.presentText(renderLevel, camera, elapsed, renderLanguage);
@@ -166,7 +177,7 @@ export class PassauPixelRenderer {
       viewportX: camera.viewport.x, viewportY: camera.viewport.y, viewportWidth: camera.viewport.width, viewportHeight: camera.viewport.height,
       hasOverlay,
     });
-    this.present(camera, profile, elapsed, hasOverlay, overlayChanged, worldTextOverlay);
+    this.present(camera, profile, elapsed, hasOverlay, overlayChanged, worldTextOverlay, options.sceneChanged !== false);
     const tile = level.board.tileSize; const playerScreen = projectWorldPoint(camera, { x: player.x * tile + tile / 2, y: player.y * tile + tile / 2 }); const bounds = visibleWorldBounds(camera);
     const entities = cats.map((cat, index) => { const world = { x: cat.x * tile + tile / 2, y: cat.y * tile + tile / 2 }; return { id: cat.id ?? `cat-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - cat.x, player.y - cat.y), color: cat.color, respawnTimer: cat.respawnTimer ?? 0 }; });
     const characterEntities = characters.map((character, index) => { const world = { x: character.x * tile + tile / 2, y: character.y * tile + tile / 2 }; return { id: character.id ?? `character-${index + 1}`, index, screen: projectWorldPoint(camera, world), onScreen: world.x >= bounds.left && world.x <= bounds.right && world.y >= bounds.top && world.y <= bounds.bottom, distance: Math.hypot(player.x - character.x, player.y - character.y), color: character.color }; });
@@ -183,7 +194,7 @@ export class PassauPixelRenderer {
     gradient.addColorStop(0, 'rgba(2, 8, 12, 0)'); gradient.addColorStop(1, 'rgba(2, 8, 12, 0.28)'); context.fillStyle = gradient; context.fillRect(0, 0, width, height);
   }
 
-  present(camera, profile, elapsed, hasOverlay, overlayChanged = true, worldOverlayState = { visible: false, changed: false }) {
+  present(camera, profile, elapsed, hasOverlay, overlayChanged = true, worldOverlayState = { visible: false, changed: false }, sceneChanged = true) {
     let scene = this.scene;
     let presentationCamera = camera;
     if (this.gpuScene && this.gpuSceneContext) {
@@ -222,11 +233,34 @@ export class PassauPixelRenderer {
       }
     }
     this.presentation.present({
-      scene, overlay: this.overlay, hasOverlay, overlayChanged,
+      scene, sceneChanged, overlay: this.overlay, hasOverlay, overlayChanged,
       worldOverlay: this.worldOverlay, hasWorldOverlay: worldOverlayState.visible, worldOverlayChanged: worldOverlayState.changed,
       camera: presentationCamera, worldCamera: camera, profile, elapsed, pixelRatio: this.pixelRatio,
       sceneScale: this.sceneScale, worldOverlayScale: this.worldOverlayScale,
     });
+  }
+
+  prepareStaticWorld(level, pellets, elapsed, language, staticRevision) {
+    const pelletSize = collectionSize(pellets);
+    const key = `${level.id}|${staticRevision ?? 'legacy'}|${language}`;
+    const legacy = staticRevision == null;
+    const cache = this.staticWorldCache;
+    const unchanged = cache.key === key && (!legacy
+      || (cache.pellets === pellets && cache.pelletSize === pelletSize && cache.decorations === level.decorations));
+    if (unchanged) return false;
+    this.prepareEnvironment(level, elapsed, language);
+    const context = this.staticWorldContext;
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, this.staticWorld.width, this.staticWorld.height);
+    context.drawImage(this.environment, 0, 0);
+    context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+    level.decorations.forEach((item) => {
+      if (isStaticWorldDecoration(item)) drawDecoration(context, item, level.board.tileSize, 0, language);
+    });
+    drawCollectibles(context, { pellets }, level.board.tileSize, 0);
+    this.staticWorldCache = { key, pellets, pelletSize, decorations: level.decorations };
+    this.staticWorldBuilds += 1;
+    return true;
   }
 
   prepareEnvironment(level, elapsed, language) {
@@ -371,6 +405,7 @@ export class PassauPixelRenderer {
         reason: this.displayMetrics.reason,
       } : null,
       gpuCropResizes: this.gpuCropResizes,
+      staticWorldBuilds: this.staticWorldBuilds,
       postProcess: this.lastPostProcessProfile ? {
         scanlines: this.lastPostProcessProfile.scanlines,
         scanlinePeriod: this.lastPostProcessProfile.scanlinePeriod,
