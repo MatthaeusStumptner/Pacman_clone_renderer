@@ -13,20 +13,29 @@ function compileShader(gl, type, source) {
 }
 
 function createProgram(gl) {
-  const vertex = compileShader(gl, gl.VERTEX_SHADER, WEBGL_VERTEX_SHADER);
-  const fragment = compileShader(gl, gl.FRAGMENT_SHADER, WEBGL_FRAGMENT_SHADER);
-  const program = gl.createProgram();
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  gl.deleteShader(vertex);
-  gl.deleteShader(fragment);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const message = gl.getProgramInfoLog(program) || 'WebGL-Programm konnte nicht verknüpft werden.';
-    gl.deleteProgram(program);
-    throw new Error(message);
+  let vertex;
+  let fragment;
+  let program;
+  try {
+    vertex = compileShader(gl, gl.VERTEX_SHADER, WEBGL_VERTEX_SHADER);
+    fragment = compileShader(gl, gl.FRAGMENT_SHADER, WEBGL_FRAGMENT_SHADER);
+    program = gl.createProgram();
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    gl.deleteShader(vertex); vertex = null;
+    gl.deleteShader(fragment); fragment = null;
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const message = gl.getProgramInfoLog(program) || 'WebGL-Programm konnte nicht verknüpft werden.';
+      throw new Error(message);
+    }
+    return program;
+  } catch (error) {
+    if (vertex) gl.deleteShader(vertex);
+    if (fragment) gl.deleteShader(fragment);
+    if (program) gl.deleteProgram(program);
+    throw error;
   }
-  return program;
 }
 
 function createTexture() {
@@ -82,9 +91,9 @@ export class WebGL2PresentationBackend {
     this.emptyOverlay.width = 1; this.emptyOverlay.height = 1;
     this.handleLost = (event) => { event.preventDefault(); this.contextLost = true; };
     this.handleRestored = () => { this.contextLost = false; this.initialize(); };
+    this.initialize();
     canvas.addEventListener?.('webglcontextlost', this.handleLost);
     canvas.addEventListener?.('webglcontextrestored', this.handleRestored);
-    this.initialize();
   }
 
   initialize() {

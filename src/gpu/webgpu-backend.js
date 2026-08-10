@@ -281,5 +281,10 @@ async function initializeWebGPU(canvas, options = {}) {
 export async function createWebGPUBackend(canvas, options = {}) {
   const initialized = await initializeWebGPU(canvas, options);
   if (!initialized) return null;
-  return new WebGPUPresentationBackend(canvas, initialized.gpu, initialized.adapter, initialized.device, initialized.context, initialized.format, initialized.pipeline);
+  try {
+    return new WebGPUPresentationBackend(canvas, initialized.gpu, initialized.adapter, initialized.device, initialized.context, initialized.format, initialized.pipeline);
+  } catch (error) {
+    initialized.device.destroy();
+    throw error;
+  }
 }

@@ -31,6 +31,33 @@ function candidateOrder(requestedBackend, options) {
   return options.preferWebGPU === false ? ['webgl2', 'canvas2d'] : ['webgpu', 'webgl2', 'canvas2d'];
 }
 
+function preparationCanvas(canvas) {
+  const document = canvas.ownerDocument ?? globalThis.document;
+  const prepared = document?.createElement?.('canvas');
+  if (!prepared || prepared === canvas) return null;
+  prepared.width = 1;
+  prepared.height = 1;
+  return prepared;
+}
+
+function createPreparedSyncBackend(canvas, factory) {
+  const preparedCanvas = preparationCanvas(canvas);
+  if (!preparedCanvas) return null;
+  const preparedBackend = factory(preparedCanvas);
+  if (!preparedBackend) return null;
+  preparedBackend.destroy();
+  return factory(canvas);
+}
+
+async function createPreparedBackend(canvas, factory) {
+  const preparedCanvas = preparationCanvas(canvas);
+  if (!preparedCanvas) return null;
+  const preparedBackend = await factory(preparedCanvas);
+  if (!preparedBackend) return null;
+  preparedBackend.destroy();
+  return factory(canvas);
+}
+
 export async function selectPresentationBackend(requestedBackend, candidates, options = {}) {
   const requested = backendName(requestedBackend);
   let firstFailure = null;
@@ -58,7 +85,7 @@ export function createSyncPresentationBackend(canvas, options = {}) {
   let firstFailure = null;
   if (requested === 'auto' || requested === 'webgl2') {
     try {
-      const backend = createWebGL2Backend(canvas, options);
+      const backend = createPreparedSyncBackend(canvas, (target) => createWebGL2Backend(target, options));
       if (!backend) throw new Error(unavailableMessage.webgl2);
       return withDiagnostics(backend, requested, null);
     } catch (error) {
@@ -72,8 +99,8 @@ export function createSyncPresentationBackend(canvas, options = {}) {
 
 export async function createPresentationBackend(canvas, options = {}) {
   return selectPresentationBackend(backendName(options.backend), {
-    webgpu: () => createWebGPUBackend(canvas, options),
-    webgl2: () => createWebGL2Backend(canvas, options),
+    webgpu: () => createPreparedBackend(canvas, (target) => createWebGPUBackend(target, options)),
+    webgl2: () => createPreparedSyncBackend(canvas, (target) => createWebGL2Backend(target, options)),
     canvas2d: () => new Canvas2DPresentationBackend(canvas),
   }, options);
 }

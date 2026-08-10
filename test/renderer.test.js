@@ -13,7 +13,7 @@ function fakeCanvas({ width = 0, height = 0, onLayoutRead, onClientSizeRead } = 
     },
     set(target, property, value) { target[property] = value; return true; },
   });
-  const scene = { width: 0, height: 0, getContext: () => context };
+  const scene = { width: 0, height: 0, getContext: (kind) => kind === '2d' ? context : null };
   return {
     width: 0, height: 0,
     get clientWidth() { onClientSizeRead?.(); return width; },
