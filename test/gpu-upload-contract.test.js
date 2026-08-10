@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { PassauPixelRenderer } from '../src/passau-pixel-renderer.js';
 import { WebGL2PresentationBackend } from '../src/gpu/webgl2-backend.js';
 import { WebGPUPresentationBackend } from '../src/gpu/webgpu-backend.js';
 
@@ -9,6 +10,31 @@ function fakeCanvas() {
     width: 320,
     height: 240,
     ownerDocument: { createElement: () => ({ width: 0, height: 0, getContext: () => emptyContext }) },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+
+function rendererCanvas() {
+  const gradient = { addColorStop() {} };
+  const createContext = () => new Proxy({}, {
+    get(target, property) {
+      if (property in target) return target[property];
+      if (property === 'createLinearGradient' || property === 'createRadialGradient') return () => gradient;
+      if (property === 'measureText') return () => ({ width: 0 });
+      return () => {};
+    },
+    set(target, property, value) { target[property] = value; return true; },
+  });
+  const createSurface = () => ({ width: 0, height: 0, getContext: () => createContext() });
+  return {
+    width: 0,
+    height: 0,
+    clientWidth: 120,
+    clientHeight: 120,
+    getContext: () => createContext(),
+    ownerDocument: { createElement: createSurface },
+    getBoundingClientRect: () => ({ width: 120, height: 120 }),
     addEventListener() {},
     removeEventListener() {},
   };
@@ -287,3 +313,32 @@ test('reuploads clean-marked WebGPU textures after device recovery', async () =>
   assert.equal(backend.snapshot().textureReallocations, 6);
   assert.equal(backend.snapshot().sceneUploadSkips, 0);
 }));
+
+test('forces a clean-marked scene upload when the GPU crop origin changes', () => {
+  const canvas = rendererCanvas();
+  const { gl, calls } = recordingWebGL2Context();
+  const backend = new WebGL2PresentationBackend(canvas, gl);
+  const renderer = new PassauPixelRenderer(canvas, { pixelRatio: 1, presentationBackend: backend });
+  renderer.resize({ width: 120, height: 120, devicePixelRatio: 1 });
+  renderer.scene.width = 600;
+  renderer.scene.height = 600;
+  const frame = presentationFrame();
+  const camera = {
+    source: { x: 60, y: 60, width: 120, height: 120 },
+    viewport: { x: 0, y: 0, width: 120, height: 120 },
+  };
+
+  renderer.present(camera, frame.profile, 0, false, false, { visible: false, changed: false }, false);
+  const firstUploadBytes = backend.snapshot().sceneUploadedBytes;
+  assert.equal(firstUploadBytes, 128 * 128 * 4);
+  assert.equal(calls.texSubImage2D, 3);
+  renderer.present(camera, frame.profile, 0, false, false, { visible: false, changed: false }, false);
+  assert.equal(backend.snapshot().sceneUploadSkips, 1);
+  assert.equal(backend.snapshot().sceneUploadedBytes, firstUploadBytes);
+  assert.equal(calls.texSubImage2D, 3);
+
+  renderer.present({ ...camera, source: { ...camera.source, x: 300, y: 300 } }, frame.profile, 0, false, false, { visible: false, changed: false }, false);
+  assert.equal(backend.snapshot().sceneUploadSkips, 1);
+  assert.equal(backend.snapshot().sceneUploadedBytes, firstUploadBytes * 2);
+  assert.equal(calls.texSubImage2D, 4);
+});

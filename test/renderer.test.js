@@ -54,7 +54,7 @@ function recordingRenderCanvas() {
       if (property === 'createLinearGradient' || property === 'createRadialGradient') return () => gradient;
       if (property === 'measureText') return () => ({ width: 0 });
       if (property === 'fillText') return (value) => { target.texts.push(value); target.operations.push(['text', value]); };
-      if (property === 'fillRect') return (...args) => { target.operations.push(['rect', ...args]); };
+      if (property === 'fillRect') return (...args) => { target.operations.push(['rect', target.fillStyle, ...args]); };
       return () => {};
     },
     set(target, property, value) { target[property] = value; return true; },
@@ -169,6 +169,38 @@ test('forwards explicit clean scene markers while preserving the legacy dirty de
   renderer.render({ level }, { staticRevision: 1 });
   assert.equal(presented[0].sceneChanged, false);
   assert.equal(presented[1].sceneChanged, true);
+});
+
+test('advances appearance animation frames while reusing the static world', () => {
+  const level = {
+    ...sampleLevel(),
+    decorations: [{
+      id: 'animated-sprite', type: 'custom', x: 1, y: 1, width: 1, height: 1, color: '#ffffff',
+      appearance: {
+        width: 1, height: 1, palette: ['transparent', '#ff0000', '#0000ff'], pixels: ['1'],
+        animations: [{ id: 'blink', fps: 1, loop: true, frames: [{ pixels: ['1'] }, { pixels: ['2'] }] }],
+      },
+      spriteAnimation: 'blink',
+    }],
+  };
+  const renderer = new PassauPixelRenderer(recordingRenderCanvas(), { pixelRatio: 1, presentationBackend: fakePresentationBackend() });
+  renderer.render({ level, elapsed: 0 }, { staticRevision: 1 });
+  renderer.sceneContext.operations.length = 0;
+  renderer.render({ level, elapsed: 1 }, { staticRevision: 1 });
+  assert.ok(renderer.sceneContext.operations.some(([type, color]) => type === 'rect' && color === '#0000ff'));
+});
+
+test('draws snapshot-controlled decorations at their current position without rebuilding the static world', () => {
+  const level = createLevelDocument({
+    ...sampleLevel(),
+    decorations: [{ id: 'moving-rock', type: 'rock', x: 1, y: 1, width: 1, height: 1, color: '#123abc' }],
+  });
+  const renderer = new PassauPixelRenderer(recordingRenderCanvas(), { pixelRatio: 1, presentationBackend: fakePresentationBackend() });
+  renderer.render({ level, decorations: level.decorations }, { staticRevision: 1 });
+  renderer.sceneContext.operations.length = 0;
+  renderer.render({ level, decorations: [{ ...level.decorations[0], x: 4 }] }, { staticRevision: 1 });
+  assert.equal(renderer.rendererInfo().staticWorldBuilds, 1);
+  assert.ok(renderer.sceneContext.operations.some(([type, color, left]) => type === 'rect' && color === '#123abc' && left > 96));
 });
 
 test('draws active and inactive event visuals after reusing the static world', () => {
