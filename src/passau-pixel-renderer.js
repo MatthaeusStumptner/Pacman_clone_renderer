@@ -57,7 +57,7 @@ export class PassauPixelRenderer {
     this.context = this.overlayContext;
     this.overlayCache = { decorations: null, language: '', width: 0, height: 0, source: null, viewport: null, hasOverlay: false };
     this.gpuCropResizes = 0;
-    this.pixelRatio = clampRatio(pixelRatio ?? globalThis.devicePixelRatio, this.pixelRatioLimit); this.zoom = zoom; this.level = null; this.grid = null;
+    this.pixelRatio = clampRatio(pixelRatio ?? globalThis.devicePixelRatio, this.pixelRatioLimit); this.displayMetrics = null; this.zoom = zoom; this.level = null; this.grid = null;
   }
 
   setLevel(levelInput) {
@@ -73,12 +73,21 @@ export class PassauPixelRenderer {
     return this.level;
   }
 
-  resize() {
-    const bounds = this.canvas.getBoundingClientRect(); const ratio = clampRatio(globalThis.devicePixelRatio ?? this.pixelRatio, this.pixelRatioLimit);
-    const width = Math.max(1, Math.round((bounds.width || this.canvas.clientWidth || 1) * ratio)); const height = Math.max(1, Math.round((bounds.height || this.canvas.clientHeight || 1) * ratio));
-    this.presentation.resize(width, height);
-    if (this.overlay.width !== width) this.overlay.width = width; if (this.overlay.height !== height) this.overlay.height = height; this.pixelRatio = ratio;
-    return { width: width / ratio, height: height / ratio, pixelRatio: ratio };
+  resize(metrics) {
+    const legacy = !metrics;
+    const bounds = legacy ? this.canvas.getBoundingClientRect() : metrics;
+    const width = Math.max(1, Number(legacy ? bounds.width || this.canvas.clientWidth : bounds.width) || 1);
+    const height = Math.max(1, Number(legacy ? bounds.height || this.canvas.clientHeight : bounds.height) || 1);
+    const actualPixelRatio = Math.max(1, Number(metrics?.devicePixelRatio ?? globalThis.devicePixelRatio ?? this.pixelRatio) || 1);
+    const pixelRatio = clampRatio(actualPixelRatio, this.pixelRatioLimit);
+    const bufferWidth = Math.max(1, Math.round(width * pixelRatio));
+    const bufferHeight = Math.max(1, Math.round(height * pixelRatio));
+    const changed = !this.displayMetrics || this.displayMetrics.bufferWidth !== bufferWidth || this.displayMetrics.bufferHeight !== bufferHeight;
+    if (changed) this.presentation.resize(bufferWidth, bufferHeight);
+    if (this.overlay.width !== bufferWidth) this.overlay.width = bufferWidth; if (this.overlay.height !== bufferHeight) this.overlay.height = bufferHeight;
+    this.pixelRatio = pixelRatio;
+    this.displayMetrics = { width, height, actualPixelRatio, pixelRatio, bufferWidth, bufferHeight, reason: metrics?.reason ?? (legacy ? 'legacy' : undefined) };
+    return { width, height, pixelRatio, bufferWidth, bufferHeight, changed, reason: this.displayMetrics.reason };
   }
 
   render(snapshot, options = {}) {
@@ -114,7 +123,7 @@ export class PassauPixelRenderer {
       scene.fillStyle = color;
       scene.fillRect(x * level.board.tileSize + 2, y * level.board.tileSize + 2, width * level.board.tileSize - 4, height * level.board.tileSize - 4);
     }
-    const display = this.resize(); const viewport = options.viewport ?? { x: 0, y: 0, width: display.width, height: display.height };
+    const display = this.displayMetrics ?? this.resize(); const viewport = options.viewport ?? { x: 0, y: 0, width: display.width, height: display.height };
     const cameraTarget = options.cameraTarget ?? { x: player.x * level.board.tileSize + level.board.tileSize / 2, y: player.y * level.board.tileSize + level.board.tileSize / 2 };
     const calculatedCamera = calculateCamera({ worldWidth, worldHeight, viewport, target: cameraTarget, zoom: options.zoom ?? this.zoom, enabled: options.cameraEnabled !== false });
     const camera = snapCameraToTexels(calculatedCamera, this.sceneScale, worldWidth, worldHeight);
@@ -128,7 +137,7 @@ export class PassauPixelRenderer {
     const profile = resolvePostProcessProfile(level, snapshot, {
       quality: options.quality ?? this.quality,
       reducedMotion: options.reducedMotion,
-      actualPixelRatio: globalThis.devicePixelRatio,
+      actualPixelRatio: display.actualPixelRatio,
       effectivePixelRatio: this.pixelRatio,
     });
     this.lastPostProcessProfile = profile;
@@ -344,6 +353,15 @@ export class PassauPixelRenderer {
       ...this.presentation.snapshot(),
       quality: this.quality,
       pixelRatio: this.pixelRatio,
+      display: this.displayMetrics ? {
+        width: this.displayMetrics.width,
+        height: this.displayMetrics.height,
+        actualPixelRatio: this.displayMetrics.actualPixelRatio,
+        pixelRatio: this.displayMetrics.pixelRatio,
+        bufferWidth: this.displayMetrics.bufferWidth,
+        bufferHeight: this.displayMetrics.bufferHeight,
+        reason: this.displayMetrics.reason,
+      } : null,
       gpuCropResizes: this.gpuCropResizes,
       postProcess: this.lastPostProcessProfile ? {
         scanlines: this.lastPostProcessProfile.scanlines,
