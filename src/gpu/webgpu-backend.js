@@ -1,6 +1,6 @@
 import { WEBGPU_SHADER } from './shaders.js';
 
-const UNIFORM_FLOATS = 24;
+const UNIFORM_FLOATS = 28;
 
 export class WebGPUPresentationBackend {
   constructor(canvas, gpu, adapter, device, context, format, pipeline) {
@@ -173,6 +173,10 @@ export class WebGPUPresentationBackend {
     uniforms[21] = profile.hit;
     uniforms[22] = profile.distortion;
     uniforms[23] = profile.scanlines;
+    uniforms[24] = profile.scanlinePeriod ?? 4;
+    uniforms[25] = profile.rgbSplitTexels ?? 0;
+    uniforms[26] = 0;
+    uniforms[27] = 0;
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({

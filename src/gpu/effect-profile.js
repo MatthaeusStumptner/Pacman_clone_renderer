@@ -86,14 +86,20 @@ export function resolvePostProcessProfile(level, snapshot = {}, options = {}) {
     : 0.35;
   const quality = resolveRendererQuality(options.quality);
   const reducedMotion = Boolean(options.reducedMotion);
+  const actualPixelRatio = Math.max(1, Number(options.actualPixelRatio) || 1);
+  const effectivePixelRatio = Math.max(1, Number(options.effectivePixelRatio) || actualPixelRatio);
+  const integerOutput = Math.abs(actualPixelRatio - Math.round(actualPixelRatio)) < 0.001;
+  const nativeOutput = Math.abs(actualPixelRatio - effectivePixelRatio) < 0.001;
+  const stableScanlines = integerOutput && nativeOutput && !reducedMotion;
   const motionScale = reducedMotion ? 0 : quality === 'performance' ? 0.55 : quality === 'balanced' ? 0.78 : 1;
   const [red, green, blue] = colorChannels(profileColor(level, mode));
   const intensityScale = authoredProfile?.intensityScale ?? 1;
+  const intensity = clamp(authoredIntensity * intensityScale * (quality === 'performance' ? 0.62 : quality === 'balanced' ? 0.82 : 1), 0.08, 0.82);
   const distortionScale = quality === 'performance' ? 0.55 : quality === 'balanced' ? 0.78 : 1;
   return Object.freeze({
     mode,
     modeIndex: EFFECT_MODES[mode],
-    intensity: clamp(authoredIntensity * intensityScale * (quality === 'performance' ? 0.62 : quality === 'balanced' ? 0.82 : 1), 0.08, 0.82),
+    intensity,
     distortion: reducedMotion ? 0 : clamp((authoredProfile?.distortion ?? 0.08) * distortionScale, 0, 0.4),
     motionScale,
     reducedMotion,
@@ -102,7 +108,9 @@ export function resolvePostProcessProfile(level, snapshot = {}, options = {}) {
     power: clamp((Number(snapshot.powerTimer) || 0) / 6),
     hit: clamp((Number(snapshot.hitTimer) || 0) / 0.9),
     vignette: quality === 'performance' ? 0.08 : 0.14,
-    scanlines: reducedMotion ? 0.02 : quality === 'quality' ? 0.075 : 0.045,
+    scanlines: stableScanlines ? (quality === 'quality' ? 0.055 : 0.035) : 0,
+    scanlinePeriod: 4,
+    rgbSplitTexels: mode === 'stage' && !reducedMotion ? Math.max(0, Math.round(intensity * 2)) : 0,
   });
 }
 

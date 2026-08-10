@@ -93,6 +93,8 @@ export class WebGL2PresentationBackend {
       source: gl.getUniformLocation(this.program, 'u_source'),
       worldSource: gl.getUniformLocation(this.program, 'u_world_source'),
       canvasSize: gl.getUniformLocation(this.program, 'u_canvas_size'),
+      sceneSize: gl.getUniformLocation(this.program, 'u_scene_size'),
+      sampling: gl.getUniformLocation(this.program, 'u_sampling'),
       effect: gl.getUniformLocation(this.program, 'u_effect'),
       tint: gl.getUniformLocation(this.program, 'u_tint'),
       feedback: gl.getUniformLocation(this.program, 'u_feedback'),
@@ -152,6 +154,8 @@ export class WebGL2PresentationBackend {
       gl.uniform4f(this.locations.worldSource, 0, 0, 1, 1);
     }
     gl.uniform2f(this.locations.canvasSize, this.canvas.width, this.canvas.height);
+    gl.uniform2f(this.locations.sceneSize, scene.width, scene.height);
+    gl.uniform2f(this.locations.sampling, profile.scanlinePeriod ?? 4, profile.rgbSplitTexels ?? 0);
     gl.uniform4f(this.locations.effect, elapsed, profile.modeIndex, profile.intensity, profile.motionScale);
     gl.uniform4f(this.locations.tint, profile.tint[0], profile.tint[1], profile.tint[2], profile.vignette);
     gl.uniform4f(this.locations.feedback, profile.power, profile.hit, profile.distortion, profile.scanlines);

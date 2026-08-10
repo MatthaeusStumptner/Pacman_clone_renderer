@@ -125,7 +125,13 @@ export class PassauPixelRenderer {
     const hasEditorOverlay = Boolean(options.editor?.selections?.length || options.editor?.transformSelection);
     if (options.editor?.selections?.length) this.presentEditorSelections(options.editor.selections, camera, level.board.tileSize, elapsed);
     if (options.editor?.transformSelection) this.presentTransformSelection(options.editor.transformSelection, camera, level.board.tileSize);
-    const profile = resolvePostProcessProfile(level, snapshot, { quality: options.quality ?? this.quality, reducedMotion: options.reducedMotion });
+    const profile = resolvePostProcessProfile(level, snapshot, {
+      quality: options.quality ?? this.quality,
+      reducedMotion: options.reducedMotion,
+      actualPixelRatio: globalThis.devicePixelRatio,
+      effectivePixelRatio: this.pixelRatio,
+    });
+    this.lastPostProcessProfile = profile;
     const hasOverlay = textOverlay.visible || hasEditorOverlay;
     const overlayCache = this.overlayCache;
     const overlayChanged = textOverlay.animated || hasEditorOverlay
@@ -334,7 +340,17 @@ export class PassauPixelRenderer {
   }
 
   rendererInfo() {
-    return { ...this.presentation.snapshot(), quality: this.quality, pixelRatio: this.pixelRatio, gpuCropResizes: this.gpuCropResizes };
+    return {
+      ...this.presentation.snapshot(),
+      quality: this.quality,
+      pixelRatio: this.pixelRatio,
+      gpuCropResizes: this.gpuCropResizes,
+      postProcess: this.lastPostProcessProfile ? {
+        scanlines: this.lastPostProcessProfile.scanlines,
+        scanlinePeriod: this.lastPostProcessProfile.scanlinePeriod,
+        rgbSplitTexels: this.lastPostProcessProfile.rgbSplitTexels,
+      } : null,
+    };
   }
 
   finish() { return this.presentation.finish?.(); }
