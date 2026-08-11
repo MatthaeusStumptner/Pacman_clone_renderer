@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
+import { selectBenchmarkAssertions } from './benchmark-assertion.js';
 
 const shouldAssert = process.argv.includes('--assert');
 const includeWebGPU = process.argv.includes('--webgpu');
@@ -46,6 +47,6 @@ try {
   await server.close();
 }
 
-process.stdout.write(`${JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2)}\n`);
-const failures = results.filter((result) => result.requestedBackend === 'auto' && !result.budget.passed);
-if (shouldAssert && failures.length) process.exitCode = 1;
+const assertion = selectBenchmarkAssertions(results);
+process.stdout.write(`${JSON.stringify({ generatedAt: new Date().toISOString(), results, assertion }, null, 2)}\n`);
+if (shouldAssert && !assertion.passed) process.exitCode = 1;
