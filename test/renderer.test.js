@@ -89,7 +89,7 @@ test('rebuilds a same-id level when the immutable input document changes', () =>
 test('reuses externally measured display metrics without reading layout during render', () => {
   let layoutReads = 0;
   const canvas = fakeCanvas({ width: 412, height: 712, onLayoutRead: () => { layoutReads += 1; } });
-  const renderer = new PassauPixelRenderer(canvas, { presentationBackend: fakePresentationBackend() });
+  const renderer = new PassauPixelRenderer(canvas, { quality: 'quality', presentationBackend: fakePresentationBackend() });
   renderer.resize({ width: 412, height: 712, devicePixelRatio: 2.625, reason: 'observer' });
   const readsAfterResize = layoutReads;
   renderer.setLevel(sampleLevel());
@@ -114,7 +114,7 @@ test('skips backend resize for unchanged externally measured display metrics', (
 test('normalizes zero externally measured display metrics without reading client size', () => {
   let clientSizeReads = 0;
   const canvas = fakeCanvas({ width: 412, height: 712, onClientSizeRead: () => { clientSizeReads += 1; } });
-  const renderer = new PassauPixelRenderer(canvas, { presentationBackend: fakePresentationBackend() });
+  const renderer = new PassauPixelRenderer(canvas, { quality: 'quality', presentationBackend: fakePresentationBackend() });
   assert.deepEqual(renderer.resize({ width: 0, height: 0, devicePixelRatio: 2, reason: 'hidden' }), {
     width: 1, height: 1, pixelRatio: 2, bufferWidth: 2, bufferHeight: 2, changed: true, reason: 'hidden',
   });
@@ -123,7 +123,7 @@ test('normalizes zero externally measured display metrics without reading client
 
 test('normalizes non-finite externally measured dimensions before backend resize', () => {
   const backend = fakePresentationBackend();
-  const renderer = new PassauPixelRenderer(fakeCanvas(), { presentationBackend: backend });
+  const renderer = new PassauPixelRenderer(fakeCanvas(), { quality: 'quality', presentationBackend: backend });
   assert.deepEqual(renderer.resize({ width: Infinity, height: -Infinity, devicePixelRatio: 2, reason: 'observer' }), {
     width: 1, height: 1, pixelRatio: 2, bufferWidth: 2, bufferHeight: 2, changed: true, reason: 'observer',
   });
@@ -132,7 +132,7 @@ test('normalizes non-finite externally measured dimensions before backend resize
 
 test('reports the requested backend, selected backend, and fallback reason', async () => {
   const canvas = fakeCanvas();
-  const renderer = await PassauPixelRenderer.create(canvas, { backend: 'webgl2' });
+  const renderer = await PassauPixelRenderer.create(canvas, { backend: 'webgl2', quality: 'quality' });
 
   assert.deepEqual(renderer.rendererInfo(), {
     requestedBackend: 'webgl2',
