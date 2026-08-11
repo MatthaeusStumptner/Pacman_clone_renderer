@@ -34,7 +34,7 @@ function wallInstanceAt(level, x, y) {
   return null;
 }
 
-function drawBuildingTile(context, level, grid, x, y, elapsed = 0) {
+function drawBuildingTileGeometry(context, level, grid, x, y, wall = wallInstanceAt(level, x, y)) {
   const { tileSize, columns } = level.board;
   const px = x * tileSize;
   const py = y * tileSize;
@@ -48,42 +48,50 @@ function drawBuildingTile(context, level, grid, x, y, elapsed = 0) {
     return;
   }
 
-  const wall = wallInstanceAt(level, x, y);
   const pattern = wall?.pattern ?? 'theme';
   const tone = wall?.useThemeColor === false && wall.color ? wall.color : palette.walls[(x * 3 + y * 5) % palette.walls.length];
   const accent = wall?.accent ?? '#48707a';
   const opacity = Number.isFinite(wall?.opacity) ? Math.max(0.15, Math.min(1, wall.opacity)) : 1;
-  const draw = () => {
-    context.save();
-    context.globalAlpha *= opacity;
-    context.fillStyle = '#0e2733';
-    context.fillRect(px, py, tileSize, tileSize);
-    context.fillStyle = tone;
-    context.fillRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
-    context.fillStyle = accent;
-    if (!isWall(grid, x, y - 1)) context.fillRect(px + 2, py, tileSize - 4, 3);
-    if (!isWall(grid, x - 1, y)) context.fillRect(px, py + 2, 3, tileSize - 4);
+  context.save();
+  context.globalAlpha *= opacity;
+  context.fillStyle = '#0e2733';
+  context.fillRect(px, py, tileSize, tileSize);
+  context.fillStyle = tone;
+  context.fillRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
+  context.fillStyle = accent;
+  if (!isWall(grid, x, y - 1)) context.fillRect(px + 2, py, tileSize - 4, 3);
+  if (!isWall(grid, x - 1, y)) context.fillRect(px, py + 2, 3, tileSize - 4);
 
-    if (pattern === 'brick') {
-      for (let row = 6; row < tileSize - 2; row += 6) context.fillRect(px + 2, py + row, tileSize - 4, 1);
-      context.fillRect(px + tileSize / 2, py + 2, 1, 5);
-      context.fillRect(px + tileSize / 3, py + 8, 1, 6);
-      context.fillRect(px + tileSize * 0.68, py + 14, 1, 6);
-    } else if (pattern === 'metal') {
-      context.fillRect(px + tileSize * 0.28, py + 3, 2, tileSize - 6);
-      context.fillRect(px + tileSize * 0.7, py + 3, 1, tileSize - 6);
-    } else if (pattern !== 'solid') {
-      if ((x * 13 + y * 7) % 9 === 0 || pattern === 'windows') {
-        context.fillStyle = wall?.accent ?? '#d0a94d';
-        context.fillRect(px + tileSize * 0.34, py + tileSize * 0.3, tileSize * 0.3, tileSize * 0.25);
-      } else if ((x + y) % 4 === 0) {
-        context.fillStyle = accent;
-        context.fillRect(px + tileSize * 0.3, py + tileSize * 0.34, tileSize * 0.38, 2);
-      }
+  if (pattern === 'brick') {
+    for (let row = 6; row < tileSize - 2; row += 6) context.fillRect(px + 2, py + row, tileSize - 4, 1);
+    context.fillRect(px + tileSize / 2, py + 2, 1, 5);
+    context.fillRect(px + tileSize / 3, py + 8, 1, 6);
+    context.fillRect(px + tileSize * 0.68, py + 14, 1, 6);
+  } else if (pattern === 'metal') {
+    context.fillRect(px + tileSize * 0.28, py + 3, 2, tileSize - 6);
+    context.fillRect(px + tileSize * 0.7, py + 3, 1, tileSize - 6);
+  } else if (pattern !== 'solid') {
+    if ((x * 13 + y * 7) % 9 === 0 || pattern === 'windows') {
+      context.fillStyle = wall?.accent ?? '#d0a94d';
+      context.fillRect(px + tileSize * 0.34, py + tileSize * 0.3, tileSize * 0.3, tileSize * 0.25);
+    } else if ((x + y) % 4 === 0) {
+      context.fillStyle = accent;
+      context.fillRect(px + tileSize * 0.3, py + tileSize * 0.34, tileSize * 0.38, 2);
     }
-    context.restore();
-  };
-  drawWithVisualEffects(context, wall?.effects, { left: px, top: py, width: tileSize, height: tileSize }, elapsed, draw);
+  }
+  context.restore();
+}
+
+function drawBuildingTile(context, level, grid, x, y, elapsed = 0) {
+  const { tileSize, columns } = level.board;
+  if (x === 0 || x === columns - 1) return drawBuildingTileGeometry(context, level, grid, x, y, null);
+  const wall = wallInstanceAt(level, x, y);
+  const bounds = { left: x * tileSize, top: y * tileSize, width: tileSize, height: tileSize };
+  return drawWithVisualEffects(context, wall?.effects, bounds, elapsed, () => drawBuildingTileGeometry(context, level, grid, x, y, wall));
+}
+
+function isAnimatedBuildingTile(level, x, y) {
+  return x !== 0 && x !== level.board.columns - 1 && Boolean(wallInstanceAt(level, x, y)?.effects?.length);
 }
 
 function drawDogPark(context, level, grid) {
@@ -162,21 +170,32 @@ function themeElementAnimation(level, id, fallback) {
   return level.theme.elements?.find((element) => element.id === id)?.animation ?? fallback;
 }
 
-function drawStage(context, level, elapsed) {
+function stageBounds(level) {
   const { columns, tileSize } = level.board;
   const width = 9 * tileSize;
   const height = 5.6 * tileSize;
-  const left = (columns * tileSize - width) / 2;
-  const top = 4.55 * tileSize;
+  return { tileSize, width, height, left: (columns * tileSize - width) / 2, top: 4.55 * tileSize };
+}
+
+function drawStageBackdrop(context, level) {
+  const { width, height, left, top } = stageBounds(level);
   context.fillStyle = '#0b0810';
   context.fillRect(left + 4, top + 9, width - 8, height - 9);
   context.fillStyle = '#34203f';
   context.fillRect(left + 12, top + 17, width - 24, height - 28);
+}
+
+function drawStageLights(context, level, elapsed) {
+  const { tileSize, width, height, left, top } = stageBounds(level);
   context.save(); context.globalAlpha = 0.16; applyMotionAnimation(context, themeElementAnimation(level, 'stage-lights', { type: 'none', speed: 1, amplitude: 0.15 }), elapsed, left + width / 2, top + height / 2, tileSize);
   zauberbergSpotlightPolygons(left, top, width, height).forEach(({ color, points }) => {
     context.fillStyle = color; context.beginPath(); context.moveTo(...points[0]); points.slice(1).forEach((point) => context.lineTo(...point)); context.closePath(); context.fill();
   });
   context.restore();
+}
+
+function drawStageForeground(context, level) {
+  const { width, height, left, top } = stageBounds(level);
   context.fillStyle = '#131018';
   context.fillRect(left + 15, top + 43, 28, 65);
   context.fillRect(left + width - 43, top + 43, 28, 65);
@@ -185,11 +204,55 @@ function drawStage(context, level, elapsed) {
   context.fillStyle = '#17101c'; context.fillRect(left + 54, top + height - 35, 31, 25); context.fillRect(left + width - 85, top + height - 35, 31, 25);
 }
 
+function drawStage(context, level, elapsed) {
+  drawStageBackdrop(context, level);
+  drawStageLights(context, level, elapsed);
+  drawStageForeground(context, level);
+}
+
 export function zauberbergSpotlightPolygons(left, top, width, height) {
   return [
     { color: '#ff4f87', points: [[left + 35, top + 20], [left + 74, top + height + 78], [left + 112, top + height + 78]] },
     { color: '#55d9dd', points: [[left + width - 35, top + 20], [left + width - 112, top + height + 78], [left + width - 70, top + height + 78]] },
   ];
+}
+
+export function drawEnvironmentBase(context, level, grid) {
+  const { columns, rows, tileSize } = level.board;
+  context.fillStyle = '#0b1620';
+  context.fillRect(0, 0, columns * tileSize, rows * tileSize);
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      if (!grid[y][x]) drawStreetTile(context, level, grid, x, y);
+      else if (!isAnimatedBuildingTile(level, x, y)) drawBuildingTileGeometry(context, level, grid, x, y);
+    }
+  }
+}
+
+export function drawEnvironmentAnimation(context, level, grid, elapsed = 0) {
+  const { columns, rows } = level.board;
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      if (grid[y][x] && isAnimatedBuildingTile(level, x, y)) drawBuildingTile(context, level, grid, x, y, elapsed);
+    }
+  }
+  drawLevelEdgeEffects(context, level, elapsed);
+}
+
+export function drawEnvironmentMidground(context, level, grid) {
+  if (level.theme.landmark === 'zauberberg') drawStageBackdrop(context, level);
+  else if (level.theme.landmark === 'bschuett') drawBschuett(context, level);
+  else if (level.theme.landmark === 'tabakfabrik') drawFactory(context, level);
+  else drawDogPark(context, level, grid);
+  if (level.theme.landmark === 'brahmahof-home') drawHome(context, level);
+}
+
+export function drawEnvironmentLandmarkAnimation(context, level, elapsed = 0) {
+  if (level.theme.landmark === 'zauberberg') drawStageLights(context, level, elapsed);
+}
+
+export function drawEnvironmentForeground(context, level) {
+  if (level.theme.landmark === 'zauberberg') drawStageForeground(context, level);
 }
 
 export function drawEnvironment(context, level, grid, elapsed = 0, options = {}) {

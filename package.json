@@ -1,6 +1,6 @@
 {
   "name": "@franz-lola/pixel-renderer",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "description": "Shared pixel-art renderer and level format for Franz & Lola games and tools.",
   "type": "module",
   "private": false,
@@ -18,7 +18,9 @@
     "build": "vite build",
     "test": "node --test",
     "benchmark": "node scripts/render-benchmark.mjs",
-    "benchmark:assert": "node scripts/render-benchmark.mjs --assert"
+    "benchmark:assert": "node scripts/render-benchmark.mjs --assert",
+    "test:browser": "node scripts/browser-regression.mjs",
+    "verify": "npm test && npm run build && npm run benchmark:assert && npm run test:browser"
   },
   "devDependencies": {
     "playwright": "^1.54.2",

@@ -1,16 +1,32 @@
+const animationIndexCache = new WeakMap();
+const generatedKeyframesCache = new WeakMap();
+
 export function animationById(appearance, id) {
-  return appearance?.animations?.find((animation) => animation.id === id) ?? null;
+  if (!appearance || !id) return null;
+  const animations = appearance.animations ?? [];
+  let cached = animationIndexCache.get(appearance);
+  if (!cached || cached.animations !== animations) {
+    cached = { animations, byId: new Map(animations.map((animation) => [animation.id, animation])) };
+    animationIndexCache.set(appearance, cached);
+  }
+  return cached.byId.get(id) ?? null;
 }
 
 export function animationKeyframes(animation) {
-  if (animation?.keyframes?.length) return animation.keyframes;
-  const fps = Math.max(0.25, Number(animation?.fps) || 6);
-  return (animation?.frames ?? []).map((frame, index) => ({
+  if (!animation) return [];
+  if (animation.keyframes?.length) return animation.keyframes;
+  const frames = animation.frames ?? [];
+  const fps = Math.max(0.25, Number(animation.fps) || 6);
+  const cached = generatedKeyframesCache.get(animation);
+  if (cached?.frames === frames && cached.fps === fps) return cached.keyframes;
+  const keyframes = frames.map((frame, index) => ({
     id: `keyframe-${index + 1}`,
     time: index / fps,
     easing: 'step',
     pixels: frame.pixels,
   }));
+  generatedKeyframesCache.set(animation, { frames, fps, keyframes });
+  return keyframes;
 }
 
 export function animationDuration(animation) {
@@ -45,5 +61,8 @@ export function selectAppearanceFrame(appearance, { animationId = '', state = 'i
   const duration = animationDuration(animation);
   const rawTime = Math.max(0, Number(elapsed) || 0);
   const time = animation.loop && duration > 0 ? rawTime % duration : Math.min(duration, rawTime);
-  return ([...keyframes].reverse().find((frame) => frame.time <= time) ?? keyframes[0]).pixels;
+  for (let index = keyframes.length - 1; index >= 0; index -= 1) {
+    if (keyframes[index].time <= time) return keyframes[index].pixels;
+  }
+  return keyframes[0].pixels;
 }

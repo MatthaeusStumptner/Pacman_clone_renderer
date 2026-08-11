@@ -12,7 +12,7 @@ export class Canvas2DPresentationBackend {
     if (this.canvas.height !== height) this.canvas.height = height;
   }
 
-  present({ scene, overlay, hasOverlay = true, camera, pixelRatio, sceneScale = 2 }) {
+  present({ scene, overlay, hasOverlay = true, worldOverlay, hasWorldOverlay = false, camera, worldCamera = camera, pixelRatio, sceneScale = 2, worldOverlayScale = 2 }) {
     const context = this.context;
     const { source, viewport } = camera;
     context.setTransform(1, 0, 0, 1, 0, 0);
@@ -29,6 +29,19 @@ export class Canvas2DPresentationBackend {
       viewport.width * pixelRatio,
       viewport.height * pixelRatio,
     );
+    if (hasWorldOverlay && worldOverlay) {
+      context.drawImage(
+        worldOverlay,
+        worldCamera.source.x * worldOverlayScale,
+        worldCamera.source.y * worldOverlayScale,
+        worldCamera.source.width * worldOverlayScale,
+        worldCamera.source.height * worldOverlayScale,
+        worldCamera.viewport.x * pixelRatio,
+        worldCamera.viewport.y * pixelRatio,
+        worldCamera.viewport.width * pixelRatio,
+        worldCamera.viewport.height * pixelRatio,
+      );
+    }
     if (hasOverlay && overlay) context.drawImage(overlay, 0, 0);
     this.frameCount += 1;
   }

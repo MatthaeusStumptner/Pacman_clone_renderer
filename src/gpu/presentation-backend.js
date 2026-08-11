@@ -1,78 +1,106 @@
 import { Canvas2DPresentationBackend } from './canvas2d-backend.js';
 import { createWebGL2Backend } from './webgl2-backend.js';
 import { createWebGPUBackend } from './webgpu-backend.js';
-import { resolveRendererQuality } from './effect-profile.js';
 
 const backendName = (value) => ['canvas2d', 'webgl2', 'webgpu', 'auto'].includes(value) ? value : 'auto';
 
-function probeResources(canvas, quality) {
-  const document = canvas.ownerDocument ?? globalThis.document;
-  const scene = document.createElement('canvas');
-  const sceneScale = 1;
-  scene.width = Math.round(600 * sceneScale); scene.height = Math.round(600 * sceneScale);
-  const context = scene.getContext('2d');
-  context.fillStyle = '#071016'; context.fillRect(0, 0, scene.width, scene.height);
-  context.fillStyle = '#55d9dd';
-  for (let index = 0; index < 180; index += 1) context.fillRect(index * 47 % scene.width, index * 83 % scene.height, 18, 18);
-  const overlay = document.createElement('canvas'); overlay.width = 1; overlay.height = 1;
-  return {
-    scene,
-    overlay,
-    camera: { source: { x: 0, y: 0, width: 600, height: 600 }, viewport: { x: 0, y: 0, width: 720, height: 480 } },
-    profile: { modeIndex: 6, intensity: 0.75, motionScale: 1, tint: [1, 0.31, 0.53], vignette: 0.14, power: 0, hit: 0, reducedMotion: false, scanlines: 0.06 },
-    sceneScale,
-  };
+const unavailableMessage = {
+  webgpu: 'WebGPU ist auf diesem Gerät nicht verfügbar.',
+  webgl2: 'WebGL 2 ist auf diesem Gerät nicht verfügbar.',
+  canvas2d: 'Canvas2D ist auf diesem Gerät nicht verfügbar.',
+};
+
+function withDiagnostics(backend, requestedBackend, fallbackReason) {
+  backend.requestedBackend = requestedBackend;
+  backend.fallbackReason = fallbackReason;
+  if (typeof backend.snapshot === 'function') {
+    const snapshot = backend.snapshot.bind(backend);
+    backend.snapshot = () => ({
+      requestedBackend,
+      ...snapshot(),
+      fallbackReason,
+    });
+  }
+  return backend;
 }
 
-async function probeCandidate(canvas, kind, options, quality) {
+function candidateOrder(requestedBackend, options) {
+  if (requestedBackend === 'canvas2d') return ['canvas2d'];
+  if (requestedBackend === 'webgl2') return ['webgl2', 'canvas2d'];
+  if (requestedBackend === 'webgpu') return ['webgpu', 'webgl2', 'canvas2d'];
+  return options.preferWebGPU === false ? ['webgl2', 'canvas2d'] : ['webgpu', 'webgl2', 'canvas2d'];
+}
+
+function preparationCanvas(canvas) {
   const document = canvas.ownerDocument ?? globalThis.document;
-  const probeCanvas = document.createElement('canvas'); probeCanvas.width = 720; probeCanvas.height = 480;
-  let backend;
-  try {
-    backend = kind === 'webgpu' ? await createWebGPUBackend(probeCanvas, options) : createWebGL2Backend(probeCanvas, options);
-    if (!backend) return false;
-    const resources = probeResources(canvas, quality);
-    backend.resize(720, 480);
-    for (let frame = 0; frame < 3; frame += 1) backend.present({ ...resources, hasOverlay: false, pixelRatio: 1, elapsed: frame / 60 });
-    await backend.finish();
-    const started = performance.now();
-    for (let frame = 0; frame < 9; frame += 1) backend.present({ ...resources, hasOverlay: false, pixelRatio: 1, elapsed: frame / 60 });
-    await backend.finish();
-    const average = (performance.now() - started) / 9;
-    // Modern integrated GPUs can still show conservative timings in a short
-    // headless-style upload probe. Balanced and quality devices remain GPU
-    // eligible up to one 60 Hz frame; constrained devices keep the strict gate.
-    const threshold = quality === 'performance' ? 8 : 16.5;
-    return average <= threshold;
-  } catch {
-    return false;
-  } finally {
-    backend?.destroy();
+  const prepared = document?.createElement?.('canvas');
+  if (!prepared || prepared === canvas) return null;
+  prepared.width = 1;
+  prepared.height = 1;
+  return prepared;
+}
+
+function createPreparedSyncBackend(canvas, factory) {
+  const preparedCanvas = preparationCanvas(canvas);
+  if (!preparedCanvas) return null;
+  const preparedBackend = factory(preparedCanvas);
+  if (!preparedBackend) return null;
+  preparedBackend.destroy();
+  return factory(canvas);
+}
+
+async function createPreparedBackend(canvas, factory) {
+  const preparedCanvas = preparationCanvas(canvas);
+  if (!preparedCanvas) return null;
+  const preparedBackend = await factory(preparedCanvas);
+  if (!preparedBackend) return null;
+  preparedBackend.destroy();
+  return factory(canvas);
+}
+
+export async function selectPresentationBackend(requestedBackend, candidates, options = {}) {
+  const requested = backendName(requestedBackend);
+  let firstFailure = null;
+  let lastFailure = null;
+
+  for (const kind of candidateOrder(requested, options)) {
+    try {
+      const backend = await candidates[kind]();
+      if (!backend) throw new Error(unavailableMessage[kind]);
+      return withDiagnostics(backend, requested, firstFailure?.message ?? null);
+    } catch (error) {
+      if (requested !== 'auto' && kind === requested && options.fallback === false) throw error;
+      lastFailure = error instanceof Error ? error : new Error(String(error));
+      firstFailure ??= lastFailure;
+    }
   }
+
+  throw lastFailure;
 }
 
 export function createSyncPresentationBackend(canvas, options = {}) {
   const requested = backendName(options.backend);
   if (requested === 'webgpu') throw new Error('WebGPU benötigt PassauPixelRenderer.create(...).');
+
+  let firstFailure = null;
   if (requested === 'auto' || requested === 'webgl2') {
-    const backend = createWebGL2Backend(canvas, options);
-    if (backend) return backend;
-    if (requested === 'webgl2' && options.fallback === false) throw new Error('WebGL 2 ist auf diesem Gerät nicht verfügbar.');
+    try {
+      const backend = createPreparedSyncBackend(canvas, (target) => createWebGL2Backend(target, options));
+      if (!backend) throw new Error(unavailableMessage.webgl2);
+      return withDiagnostics(backend, requested, null);
+    } catch (error) {
+      if (requested === 'webgl2' && options.fallback === false) throw error;
+      firstFailure = error instanceof Error ? error : new Error(String(error));
+    }
   }
-  return new Canvas2DPresentationBackend(canvas);
+
+  return withDiagnostics(new Canvas2DPresentationBackend(canvas), requested, firstFailure?.message ?? null);
 }
 
 export async function createPresentationBackend(canvas, options = {}) {
-  const requested = backendName(options.backend);
-  const quality = resolveRendererQuality(options.quality);
-  if (requested === 'webgpu' || (requested === 'auto' && options.preferWebGPU !== false && await probeCandidate(canvas, 'webgpu', options, quality))) {
-    try {
-      const backend = await createWebGPUBackend(canvas, options);
-      if (backend) return backend;
-    } catch (error) {
-      if (requested === 'webgpu' && options.fallback === false) throw error;
-    }
-  }
-  if (requested === 'auto' && !await probeCandidate(canvas, 'webgl2', options, quality)) return new Canvas2DPresentationBackend(canvas);
-  return createSyncPresentationBackend(canvas, { ...options, backend: requested === 'webgpu' ? 'auto' : requested });
+  return selectPresentationBackend(backendName(options.backend), {
+    webgpu: () => createPreparedBackend(canvas, (target) => createWebGPUBackend(target, options)),
+    webgl2: () => createPreparedSyncBackend(canvas, (target) => createWebGL2Backend(target, options)),
+    canvas2d: () => new Canvas2DPresentationBackend(canvas),
+  }, options);
 }

@@ -22,6 +22,7 @@ export {
 export {
   calculateCamera,
   projectWorldPoint,
+  snapCameraToTexels,
   visibleWorldBounds,
 } from './camera.js';
 
@@ -39,6 +40,7 @@ export { ACTOR_ANIMATION_STATES, actorAnimationState, animationById, animationDu
 export { applyMotionAnimation, sampleMotionAnimation } from './motion-animation.js';
 export { DirectionalSwipeInput } from './input.js';
 export { FixedStepLoop } from './simulation/fixed-step-loop.js';
+export { PresentationFramePacer, recommendedPresentationRate } from './presentation-frame-pacer.js';
 export { moveGridActor } from './simulation/grid-motion.js';
 export { DEFAULT_DIFFICULTY_PROFILES } from './simulation/profiles.js';
 export {
