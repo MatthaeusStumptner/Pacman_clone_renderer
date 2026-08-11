@@ -53,3 +53,51 @@ test('leaves explicit backend rows as diagnostics rather than asserted benchmark
   assert.deepEqual(selection.renderWorkFailures, []);
   assert.deepEqual(selection.nonAutoDiagnostics, [row]);
 });
+test('fails closed when an auto renderer-work measurement or its render budget is invalid', () => {
+  const missingRenderMeasurement = autoRow();
+  delete missingRenderMeasurement.renderP95Ms;
+  const rows = [
+    missingRenderMeasurement,
+    autoRow({ renderP95Ms: Infinity }),
+    autoRow({ renderP95Ms: -Infinity }),
+    autoRow({ renderP95Ms: Number.NaN }),
+    { requestedBackend: 'auto', profile: 'notebook', scene: 'gameplay', renderP95Ms: 6 },
+    { ...autoRow(), budget: { passed: true, budget: {} } },
+    { ...autoRow(), budget: { passed: true, budget: { renderP95Ms: Infinity } } },
+    { ...autoRow(), budget: { passed: true, budget: { renderP95Ms: Number.NaN } } },
+  ];
+
+  const selection = selectBenchmarkAssertions(rows);
+
+  assert.equal(selection.passed, false);
+  assert.equal(selection.invalidMeasurements.length, rows.length);
+  assert.deepEqual(selection.renderWorkFailures, []);
+  assert.deepEqual(JSON.parse(JSON.stringify(selection.invalidMeasurements)).map(({ reason }) => reason), [
+    'invalid-render-p95-ms',
+    'invalid-render-p95-ms',
+    'invalid-render-p95-ms',
+    'invalid-render-p95-ms',
+    'invalid-render-p95-budget-ms',
+    'invalid-render-p95-budget-ms',
+    'invalid-render-p95-budget-ms',
+    'invalid-render-p95-budget-ms',
+  ]);
+});
+
+test('keeps valid frame-only warnings while failing closed for an invalid auto row and preserving real overflow', () => {
+  const warning = autoRow({ renderP95Ms: 6.8, frameP95Ms: 49.9, longFramePercent: 42 });
+  warning.budget.passed = false;
+  const invalid = autoRow();
+  delete invalid.renderP95Ms;
+  const overflow = autoRow({ renderP95Ms: 14.1 });
+  overflow.budget.passed = false;
+
+  const selection = selectBenchmarkAssertions([warning, invalid, overflow]);
+
+  assert.equal(selection.passed, false);
+  assert.deepEqual(selection.warnings, [warning]);
+  assert.deepEqual(selection.renderWorkFailures, [overflow]);
+  assert.deepEqual(selection.invalidMeasurements.map(({ reason }) => reason), [
+    'invalid-render-p95-ms',
+  ]);
+});
