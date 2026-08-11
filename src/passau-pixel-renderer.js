@@ -2,7 +2,7 @@ import { calculateCamera, projectWorldPoint, snapCameraToTexels, visibleWorldBou
 import { compileWallGrid, createLevelDocument } from './level-format.js';
 import { drawCat, drawWalker } from './painters/characters.js';
 import { drawCollectibles, drawEasterEggs } from './painters/collectibles.js';
-import { drawDecoration, drawEditorGrid, drawEnvironment } from './painters/environment.js';
+import { drawDecoration, drawEditorGrid, drawEnvironment, drawEnvironmentAnimation, drawEnvironmentBase, drawEnvironmentForeground, drawEnvironmentLandmarkAnimation, drawEnvironmentMidground } from './painters/environment.js';
 import { drawWithVisualEffects } from './visual-effects.js';
 import { resolvePostProcessProfile, resolveRendererQuality, rendererPixelRatioLimit } from './gpu/effect-profile.js';
 import { resolveStableCropSize } from './gpu/crop-buffer.js';
@@ -28,6 +28,11 @@ const isStaticWorldDecoration = (item, frameControlled = false) => !frameControl
   && (!item.animation?.type || item.animation.type === 'none')
   && !item.effects?.length;
 const collectionSize = (items) => items?.size ?? items?.length ?? 0;
+const environmentCadenceFrame = (backend, quality, elapsed) => {
+  if (backend !== 'canvas2d') return 0;
+  const framesPerSecond = quality === 'performance' ? 8 : quality === 'balanced' ? 15 : 20;
+  return Math.floor(elapsed * framesPerSecond);
+};
 
 function drawScaledActor(context, actor, tileSize, draw) {
   const scale = actorScale(actor);
@@ -62,6 +67,12 @@ export class PassauPixelRenderer {
       : 1;
     this.scene = this.document.createElement('canvas'); this.sceneContext = this.scene.getContext('2d');
     this.environment = this.document.createElement('canvas'); this.environmentContext = this.environment.getContext('2d');
+    this.environmentBase = this.presentation.kind === 'canvas2d' ? this.document.createElement('canvas') : null;
+    this.environmentBaseContext = this.environmentBase?.getContext('2d') ?? null;
+    this.environmentMidground = this.presentation.kind === 'canvas2d' ? this.document.createElement('canvas') : null;
+    this.environmentMidgroundContext = this.environmentMidground?.getContext('2d') ?? null;
+    this.environmentForeground = this.presentation.kind === 'canvas2d' ? this.document.createElement('canvas') : null;
+    this.environmentForegroundContext = this.environmentForeground?.getContext('2d') ?? null;
     this.environmentCache = { board: null, theme: null, language: '', frame: -1 };
     this.staticWorld = this.document.createElement('canvas'); this.staticWorldContext = this.staticWorld.getContext('2d');
     this.staticWorldCache = { key: '', pellets: null, pelletSize: -1, decorations: null, frameControlledDecorations: null };
@@ -85,6 +96,18 @@ export class PassauPixelRenderer {
     const width = this.level.board.columns * this.level.board.tileSize; const height = this.level.board.rows * this.level.board.tileSize;
     this.scene.width = Math.round(width * this.sceneScale); this.scene.height = Math.round(height * this.sceneScale); this.sceneContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.sceneContext.imageSmoothingEnabled = false;
     this.environment.width = this.scene.width; this.environment.height = this.scene.height; this.environmentContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.environmentContext.imageSmoothingEnabled = false;
+    if (this.environmentBase && this.environmentBaseContext) {
+      this.environmentBase.width = this.scene.width; this.environmentBase.height = this.scene.height;
+      this.environmentBaseContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.environmentBaseContext.imageSmoothingEnabled = false;
+    }
+    if (this.environmentMidground && this.environmentMidgroundContext) {
+      this.environmentMidground.width = this.scene.width; this.environmentMidground.height = this.scene.height;
+      this.environmentMidgroundContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.environmentMidgroundContext.imageSmoothingEnabled = false;
+    }
+    if (this.environmentForeground && this.environmentForegroundContext) {
+      this.environmentForeground.width = this.scene.width; this.environmentForeground.height = this.scene.height;
+      this.environmentForegroundContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.environmentForegroundContext.imageSmoothingEnabled = false;
+    }
     this.staticWorld.width = this.scene.width; this.staticWorld.height = this.scene.height; this.staticWorldContext.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0); this.staticWorldContext.imageSmoothingEnabled = false;
     this.worldOverlay.width = Math.round(width * this.worldOverlayScale); this.worldOverlay.height = Math.round(height * this.worldOverlayScale); this.worldOverlayContext.setTransform(this.worldOverlayScale, 0, 0, this.worldOverlayScale, 0, 0); this.worldOverlayContext.imageSmoothingEnabled = false;
     this.environmentCache = { board: null, theme: null, language: '', frame: -1 };
@@ -124,8 +147,11 @@ export class PassauPixelRenderer {
     const renderLanguage = options.language ?? 'standard';
     const worldWidth = level.board.columns * level.board.tileSize; const worldHeight = level.board.rows * level.board.tileSize; const scene = this.sceneContext;
     scene.clearRect(0, 0, worldWidth, worldHeight);
+    if (this.presentation.kind === 'canvas2d') this.prepareEnvironment(renderLevel, elapsed, renderLanguage);
     this.prepareStaticWorld(renderLevel, snapshot.pellets, elapsed, renderLanguage, options.staticRevision, frameControlledDecorations);
-    scene.save(); scene.setTransform(1, 0, 0, 1, 0, 0); scene.drawImage(this.staticWorld, 0, 0); scene.restore();
+    scene.save(); scene.setTransform(1, 0, 0, 1, 0, 0);
+    if (this.presentation.kind === 'canvas2d') scene.drawImage(this.environment, 0, 0);
+    scene.drawImage(this.staticWorld, 0, 0); scene.restore();
     renderLevel.decorations.forEach((item) => {
       if (item.type !== 'text' && !isStaticWorldDecoration(item, frameControlledDecorations)) drawDecoration(scene, item, level.board.tileSize, elapsed, renderLanguage);
     });
@@ -260,11 +286,12 @@ export class PassauPixelRenderer {
     const unchanged = cache.key === key && cache.frameControlledDecorations === frameControlledDecorations && (!legacy
       || (cache.pellets === pellets && cache.pelletSize === pelletSize && cache.decorations === level.decorations));
     if (unchanged) return false;
-    this.prepareEnvironment(level, elapsed, language);
+    const includesEnvironment = this.presentation.kind !== 'canvas2d';
+    if (includesEnvironment) this.prepareEnvironment(level, elapsed, language);
     const context = this.staticWorldContext;
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, this.staticWorld.width, this.staticWorld.height);
-    context.drawImage(this.environment, 0, 0);
+    if (includesEnvironment) context.drawImage(this.environment, 0, 0);
     context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
     level.decorations.forEach((item) => {
       if (isStaticWorldDecoration(item, frameControlledDecorations)) drawDecoration(context, item, level.board.tileSize, 0, language);
@@ -276,26 +303,60 @@ export class PassauPixelRenderer {
   }
 
   prepareEnvironment(level, elapsed, language) {
-    // Ambient scenery intentionally runs at a lower cadence than actors. It is
-    // visually indistinguishable for slow water/light motion, while avoiding a
-    // full 625-tile redraw on every gameplay frame.
-    // On GPU backends the post-process shader owns ambient movement. The
-    // authored tile layer can therefore stay resident while actors keep their
-    // full frame rate. Canvas2D retains a deliberately throttled animation.
-    const framesPerSecond = this.presentation.kind === 'canvas2d'
-      ? (this.quality === 'performance' ? 8 : this.quality === 'balanced' ? 15 : 20)
-      : 0;
-    const frame = framesPerSecond ? Math.floor(elapsed * framesPerSecond) : 0;
+    // Ambient scenery intentionally runs at a lower cadence than actors. The
+    // Canvas2D path retains static tiles and landmarks separately so cadence
+    // frames repaint only authored wall, edge, and landmark animation.
+    // GPU backends keep their original single resident environment frame.
+    const frame = environmentCadenceFrame(this.presentation.kind, this.quality, elapsed);
     const cache = this.environmentCache;
-    if (cache.board === level.board && cache.theme === level.theme && cache.language === language && cache.frame === frame) return;
+    const unchanged = cache.board === level.board && cache.theme === level.theme && cache.language === language && cache.frame === frame;
+    if (unchanged) return false;
     const width = level.board.columns * level.board.tileSize; const height = level.board.rows * level.board.tileSize;
     const context = this.environmentContext;
-    context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
-    context.clearRect(0, 0, width, height);
-    drawEnvironment(context, level, this.grid, elapsed, { language, excludeText: true, excludeDecorations: true });
-    const gradient = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.32, width / 2, height / 2, Math.max(width, height) * 0.72);
-    gradient.addColorStop(0, 'rgba(2, 8, 12, 0)'); gradient.addColorStop(1, 'rgba(2, 8, 12, 0.28)'); context.fillStyle = gradient; context.fillRect(0, 0, width, height);
+
+    if (this.presentation.kind !== 'canvas2d') {
+      context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+      context.clearRect(0, 0, width, height);
+      drawEnvironment(context, level, this.grid, elapsed, { language, excludeText: true, excludeDecorations: true });
+      const gradient = context.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.32, width / 2, height / 2, Math.max(width, height) * 0.72);
+      gradient.addColorStop(0, 'rgba(2, 8, 12, 0)'); gradient.addColorStop(1, 'rgba(2, 8, 12, 0.28)'); context.fillStyle = gradient; context.fillRect(0, 0, width, height);
+    } else {
+      const staticChanged = cache.board !== level.board || cache.theme !== level.theme;
+      if (staticChanged) {
+        const base = this.environmentBaseContext;
+        base.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+        base.clearRect(0, 0, width, height);
+        drawEnvironmentBase(base, level, this.grid);
+
+        const midground = this.environmentMidgroundContext;
+        midground.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+        midground.clearRect(0, 0, width, height);
+        drawEnvironmentMidground(midground, level, this.grid);
+
+        const foreground = this.environmentForegroundContext;
+        foreground.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+        foreground.clearRect(0, 0, width, height);
+        drawEnvironmentForeground(foreground, level);
+        const gradient = foreground.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.32, width / 2, height / 2, Math.max(width, height) * 0.72);
+        gradient.addColorStop(0, 'rgba(2, 8, 12, 0)'); gradient.addColorStop(1, 'rgba(2, 8, 12, 0.28)'); foreground.fillStyle = gradient; foreground.fillRect(0, 0, width, height);
+      }
+
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, this.environment.width, this.environment.height);
+      context.drawImage(this.environmentBase, 0, 0);
+      context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+      drawEnvironmentAnimation(context, level, this.grid, elapsed);
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.drawImage(this.environmentMidground, 0, 0);
+      context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+      drawEnvironmentLandmarkAnimation(context, level, elapsed);
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.drawImage(this.environmentForeground, 0, 0);
+      context.setTransform(this.sceneScale, 0, 0, this.sceneScale, 0, 0);
+    }
+
     this.environmentCache = { board: level.board, theme: level.theme, language, frame };
+    return true;
   }
 
   prepareWorldText(level, language) {

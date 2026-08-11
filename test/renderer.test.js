@@ -55,6 +55,7 @@ function recordingRenderCanvas() {
       if (property === 'measureText') return () => ({ width: 0 });
       if (property === 'fillText') return (value) => { target.texts.push(value); target.operations.push(['text', value]); };
       if (property === 'fillRect') return (...args) => { target.operations.push(['rect', target.fillStyle, ...args]); };
+      if (property === 'translate') return (...args) => { target.operations.push(['translate', ...args]); };
       return () => {};
     },
     set(target, property, value) { target[property] = value; return true; },
@@ -160,6 +161,51 @@ test('reuses the retained static world until its revision changes', () => {
   assert.equal(renderer.rendererInfo().staticWorldBuilds, 1);
   renderer.render(snapshot, { staticRevision: 5 });
   assert.equal(renderer.rendererInfo().staticWorldBuilds, 2);
+});
+
+test('isolates Canvas2D environment cadence animation from retained static geometry', () => {
+  const level = {
+    ...sampleLevel(),
+    board: {
+      ...sampleLevel().board,
+      walls: [
+        { id: 'retained-wall', x: 4, y: 4, width: 1, height: 1, useThemeColor: false, color: '#553322', accent: '#f5c451', pattern: 'solid' },
+        {
+          id: 'animated-wall', x: 5, y: 4, width: 1, height: 1, useThemeColor: false, color: '#aa00ff', accent: '#f5c451', pattern: 'solid',
+          effects: [{ id: 'wall-echo', type: 'echo', intensity: 0.5, speed: 1, color: '#55d9dd' }],
+        },
+      ],
+    },
+    theme: {
+      landmark: 'zauberberg',
+      elements: [{ id: 'stage-lights', animation: { type: 'bob', speed: 1, amplitude: 0.5 } }],
+      edgeEffects: [{ id: 'river', type: 'water-flow', side: 'left', speed: 1, intensity: 1, count: 1, color: '#2379a3', accent: '#f5c451' }],
+    },
+  };
+  const renderer = new PassauPixelRenderer(recordingRenderCanvas(), { pixelRatio: 1, quality: 'quality', presentationBackend: fakePresentationBackend() });
+  const snapshot = { level, pellets: new Set(['2,2']) };
+
+  renderer.render({ ...snapshot, elapsed: 0 }, { staticRevision: 7 });
+  renderer.environmentContext.operations.length = 0;
+  renderer.staticWorldContext.operations.length = 0;
+  renderer.render({ ...snapshot, elapsed: 0.049 }, { staticRevision: 7 });
+  assert.equal(renderer.environmentContext.operations.length, 0);
+  assert.equal(renderer.staticWorldContext.operations.length, 0);
+  assert.equal(renderer.rendererInfo().staticWorldBuilds, 1);
+
+  renderer.render({ ...snapshot, elapsed: 0.05 }, { staticRevision: 7 });
+  const waterRects = renderer.environmentContext.operations
+    .filter(([type, color]) => type === 'rect' && color === '#2379a3')
+    .map(([, , left, top]) => [left, top]);
+  assert.deepEqual(waterRects[0], [3, -16]);
+  assert.equal(renderer.environmentContext.operations.some(([type, color]) => type === 'rect' && color === '#aa00ff'), true);
+  assert.equal(renderer.environmentContext.operations.some(([type, x, y]) => type === 'translate' && x === 0 && y > 3 && y < 4), true);
+  assert.equal(renderer.environmentContext.operations.some(([type, color]) => type === 'rect' && color === '#0b0810'), false);
+  assert.equal(renderer.environmentContext.operations.some(([type, color]) => type === 'rect' && color === '#131018'), false);
+  assert.equal(renderer.environmentContext.operations.some(([type, color]) => type === 'rect' && color === '#0b1620'), false);
+  assert.equal(renderer.environmentContext.operations.some(([type, color]) => type === 'rect' && color === '#553322'), false);
+  assert.equal(renderer.staticWorldContext.operations.length, 0);
+  assert.equal(renderer.rendererInfo().staticWorldBuilds, 1);
 });
 
 test('legacy callers rebuild retained pellets and decorations when their inputs change', () => {
