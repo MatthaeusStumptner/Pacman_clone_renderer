@@ -41,11 +41,20 @@ Das maschinenlesbare Schema liegt unter `schema/franz-lola-level.schema.json` un
 
 `render(snapshot, options)` arbeitet unabhängig von der Bildfrequenz und kann interpolierte Actor-Snapshots anzeigen. `cameraEnabled: false` verwendet eine unverzerrte Contain-/Letterbox-Projektion für Editoren; die Spielkamera folgt bei aktivierter Kamera dem Spieler. Neue immutable Levelobjekte werden auch bei gleicher ID zuverlässig übernommen.
 
+Der Aufrufer übergibt beobachtete Anzeigegrößen explizit, damit `render()` keine Layoutmessung auslösen muss. `sceneChanged` kennzeichnet, ob die Pixelwelt seit dem letzten präsentierten Frame neu auf die GPU geladen werden muss:
+
+```js
+renderer.resize({ width: 412, height: 712, devicePixelRatio: 2.625, reason: 'resize-observer' });
+renderer.render(snapshot, { viewport: { x: 0, y: 0, width: 412, height: 712 }, sceneChanged: true });
+```
+
+Statische Aufrufer übergeben `sceneChanged: false`; der ältere Aufruf ohne Option bleibt kompatibel und gilt als geändert. Ein fraktionaler Device-Pixel-Ratio oder ein durch das Qualitätsprofil heruntergerechneter Pixel-Ratio deaktiviert Scanlines, damit beim Resampling kein Moiré entsteht.
+
 ### Canvas2D, WebGL 2 und WebGPU
 
 Die Spiellogik und die Pixelwelt bleiben deterministisch in Canvas2D. Eine getrennte Präsentationsschicht kann das fertige Bild anschließend mit WebGL 2 (GLSL ES) oder WebGPU (WGSL) verarbeiten. Dadurch bleiben Level-JSON, Kollisionen, Editor und GitHub-Pages-Deployment unverändert statisch; nur Licht, Atmosphäre und Bildschirm-Feedback laufen optional auf der GPU.
 
-`backend: 'auto'` ist der produktive Standard. Notebooks, Tablets und moderne Handys bleiben GPU-berechtigt und werden mit einem aufgewärmten Laufzeit-Probe geprüft. Nur das klar eingeschränkte `performance`-Profil verwendet ein strenges Gate. Nicht verfügbare APIs, Shaderfehler und langsame Software-GPUs fallen kontrolliert auf Canvas2D zurück. `quality: 'auto'` begrenzt zusätzlich interne Auflösung und Device-Pixel-Ratio anhand von Speicher und CPU-Kernen.
+`backend: 'auto'` ist der produktive Standard. Notebooks, Tablets und moderne Handys bleiben GPU-berechtigt. GPU-Kandidaten werden zunächst transaktional auf einem separaten Canvas vorbereitet; erst nach erfolgreicher Initialisierung wird derselbe Backendtyp am sichtbaren Canvas aufgebaut. Nicht verfügbare APIs und Shaderfehler fallen kontrolliert auf den nächsten Kandidaten bis hin zu Canvas2D zurück. Nur das klar eingeschränkte `performance`-Profil verwendet ein strenges Gate. `quality: 'auto'` begrenzt zusätzlich interne Auflösung und Device-Pixel-Ratio anhand von Speicher und CPU-Kernen.
 
 Die Pixelwelt wird auf GPU-Backends in nativer Auflösung übertragen und kameraabhängig zugeschnitten. Der Crop-Puffer wächst in quantisierten Schritten und wird während Kamera- oder Cutscene-Zoom nicht wieder verkleinert; dadurch entfallen fortlaufende Canvas- und GPU-Textur-Neuanlagen. Die statische Umgebung bleibt gecacht, Pixel-Sprite-Frames werden einmal rasterisiert und wiederverwendet, und kontinuierliche Atmosphäre, Farbe sowie Bildschirm-Feedback übernimmt der Shader.
 
@@ -74,6 +83,8 @@ npm run benchmark -- --frames=300 --webgpu
 ```
 
 Die aktuellen Render-p95-Budgets liegen bei Notebook ≤ 14 ms, Tablet ≤ 20 ms, modernem Handy ≤ 24 ms und schwachem Handy ≤ 36 ms. Die jeweils automatisch gewählte Implementierung ist das Release-Gate.
+
+Die reproduzierbare 300-Frame-Matrix, Backend-Auflösung, Upload- und Allokationszähler sowie der getrennte Einmalaufwand der transaktionalen GPU-Vorbereitung stehen in [`benchmark/BASELINE.md`](benchmark/BASELINE.md). Der Vorbereitungsaufwand gehört zum Start und wird nicht auf den Render-p95 der eingeschwungenen Frames aufgeschlagen.
 
 `FixedStepLoop` und `LevelSimulation` sind der gemeinsame Gameplay-Vertrag. Die Simulation läuft mit festen 120 Updates pro Sekunde. `PresentationFramePacer` begrenzt davon unabhängig die teure Präsentation auf stabile 60 FPS beziehungsweise 30 FPS im `performance`-Profil. Displays mit 60, 120 oder 175 Hz zeigen damit denselben interpolierten Takt, ohne Spieltempo, Kollisionen oder Richtungswechsel zu verändern.
 
